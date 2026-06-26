@@ -59,7 +59,6 @@ public class BanMenu extends PaginationGUI {
             Bukkit.getScheduler().runTask(plugin, () -> {
                 new AnvilGUIBridge(plugin).openDurationInput(admin, durationStr -> {
                     Bukkit.getScheduler().runTask(plugin, () -> {
-                        com.adminpanel.util.DurationParser parser = new com.adminpanel.util.DurationParser();
                         long duration = com.adminpanel.util.DurationParser.parse(durationStr);
                         plugin.getPunishmentManager().banPlayer(
                                 target.getName(), reason, duration, admin.getName());

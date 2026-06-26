@@ -35,23 +35,23 @@ public class AttributeMenu extends PaginationGUI {
         List<ItemStack> items = new ArrayList<>();
 
         for (Attribute attr : Attribute.values()) {
-            Material icon = switch (attr) {
-                case GENERIC_ATTACK_DAMAGE -> Material.IRON_SWORD;
-                case GENERIC_ATTACK_SPEED -> Material.FEATHER;
-                case GENERIC_ARMOR -> Material.IRON_CHESTPLATE;
-                case GENERIC_ARMOR_TOUGHNESS -> Material.DIAMOND;
-                case GENERIC_LUCK -> Material.CLOVER;
-                case GENERIC_MAX_HEALTH -> Material.RED_APPLE;
-                case GENERIC_MOVEMENT_SPEED -> Material.SUGAR;
-                case GENERIC_FOLLOW_RANGE -> Material.SPYGLASS;
-                case GENERIC_KNOCKBACK_RESISTANCE -> Material.SHIELD;
-                default -> Material.PAPER;
-            };
+            // Use icon based on attribute name keywords
+            String name = attr.name().toUpperCase();
+            Material icon;
+            if (name.contains("DAMAGE") || name.contains("ATTACK")) icon = Material.IRON_SWORD;
+            else if (name.contains("SPEED")) icon = Material.SUGAR;
+            else if (name.contains("ARMOR") && name.contains("TOUGHNESS")) icon = Material.DIAMOND;
+            else if (name.contains("ARMOR")) icon = Material.IRON_CHESTPLATE;
+            else if (name.contains("HEALTH")) icon = Material.APPLE;
+            else if (name.contains("LUCK")) icon = Material.EMERALD;
+            else if (name.contains("FOLLOW")) icon = Material.SPYGLASS;
+            else if (name.contains("KNOCKBACK")) icon = Material.SHIELD;
+            else icon = Material.PAPER;
 
             items.add(new ItemBuilder(icon)
                     .name("&e" + attr.name())
                     .lore(
-                            "&7Description: &f" + (attr.getDescription() != null ? attr.getDescription() : "N/A"),
+                            "&7Key: &f" + attr.getKey().toString(),
                             "",
                             "&a&lClick to set value (AnvilGUI)",
                             "&c&lShift-click to remove modifier")

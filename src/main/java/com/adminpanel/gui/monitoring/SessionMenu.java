@@ -38,8 +38,8 @@ public class SessionMenu extends PaginationGUI {
         List<ItemStack> items = new ArrayList<>();
 
         // Info header
-        long playtime = plugin.getSessionManager().getPlaytime(target.getUniqueId());
-        String lastIP = plugin.getSessionManager().getLastIP(target.getUniqueId());
+        long playtime = plugin.getSessionManager().getPlaytime(target.getUniqueId().toString());
+        String lastIP = plugin.getSessionManager().getLastIP(target.getUniqueId().toString());
 
         items.add(new ItemBuilder(Material.PAPER)
                 .name("&e&l" + (target.getName() != null ? target.getName() : "Unknown"))
@@ -52,7 +52,7 @@ public class SessionMenu extends PaginationGUI {
                 .build());
 
         // Session entries
-        List<Map<String, Object>> sessions = plugin.getSessionManager().getSessions(target.getUniqueId());
+        List<Map<String, Object>> sessions = plugin.getSessionManager().getSessions(target.getUniqueId().toString());
         for (Map<String, Object> session : sessions) {
             long joinTime = ((Number) session.get("join_time")).longValue();
             long leaveTime = session.get("leave_time") != null ? ((Number) session.get("leave_time")).longValue() : 0;

@@ -4,7 +4,6 @@ import com.adminpanel.command.StealthCommand;
 import com.adminpanel.hooks.VaultHook;
 import com.adminpanel.listener.*;
 import com.adminpanel.manager.*;
-import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -82,10 +81,15 @@ public final class AdminPanel extends JavaPlugin {
 
         // Unregister dynamic commands
         try {
-            Bukkit.getCommandMap().getKnownCommands().remove("ap");
-            Bukkit.getCommandMap().getKnownCommands().remove("adminpanel");
-            Bukkit.getCommandMap().getKnownCommands().remove("adminpanel:ap");
-            Bukkit.getCommandMap().getKnownCommands().remove("adminpanel:adminpanel");
+            Object commandMap = getCommandMap();
+            if (commandMap != null) {
+                var knownCommands = (java.util.Map<String, org.bukkit.command.Command>) commandMap.getClass()
+                        .getMethod("getKnownCommands").invoke(commandMap);
+                knownCommands.remove("ap");
+                knownCommands.remove("adminpanel");
+                knownCommands.remove("adminpanel:ap");
+                knownCommands.remove("adminpanel:adminpanel");
+            }
         } catch (Exception e) {
             getLogger().log(Level.WARNING, "Error unregistering commands", e);
         }
@@ -97,23 +101,51 @@ public final class AdminPanel extends JavaPlugin {
     /**
      * Register /ap and /adminpanel dynamically via CommandMap.
      * These commands are invisible to players who lack adminpanel.use permission.
+     * Uses reflection for Spigot compatibility (Paper has Bukkit.getCommandMap()).
      */
     private void registerStealthCommands() {
-        // Register /adminpanel
-        StealthCommand mainCmd = new StealthCommand(this, "adminpanel");
-        Bukkit.getCommandMap().register("adminpanel", mainCmd);
+        try {
+            Object commandMap = getCommandMap();
+            if (commandMap == null) {
+                getLogger().severe("Could not access CommandMap! Stealth commands not registered.");
+                return;
+            }
 
-        // Register /ap alias
-        StealthCommand aliasCmd = new StealthCommand(this, "ap");
-        Bukkit.getCommandMap().register("adminpanel", aliasCmd);
+            // Register /adminpanel
+            StealthCommand mainCmd = new StealthCommand(this, "adminpanel");
+            commandMap.getClass().getMethod("register", String.class, org.bukkit.command.Command.class)
+                    .invoke(commandMap, "adminpanel", mainCmd);
 
-        // Add fallback fallback aliases
-        Bukkit.getCommandMap().getKnownCommands().put("adminpanel:ap", aliasCmd);
-        Bukkit.getCommandMap().getKnownCommands().put("ap", aliasCmd);
-        Bukkit.getCommandMap().getKnownCommands().put("adminpanel:adminpanel", mainCmd);
-        Bukkit.getCommandMap().getKnownCommands().put("adminpanel", mainCmd);
+            // Register /ap alias
+            StealthCommand aliasCmd = new StealthCommand(this, "ap");
+            commandMap.getClass().getMethod("register", String.class, org.bukkit.command.Command.class)
+                    .invoke(commandMap, "adminpanel", aliasCmd);
 
-        getLogger().info("Stealth commands registered: /adminpanel, /ap");
+            // Add known command aliases
+            @SuppressWarnings("unchecked")
+            var knownCommands = (java.util.Map<String, org.bukkit.command.Command>) commandMap.getClass()
+                    .getMethod("getKnownCommands").invoke(commandMap);
+            knownCommands.put("adminpanel:ap", aliasCmd);
+            knownCommands.put("ap", aliasCmd);
+            knownCommands.put("adminpanel:adminpanel", mainCmd);
+            knownCommands.put("adminpanel", mainCmd);
+
+            getLogger().info("Stealth commands registered: /adminpanel, /ap");
+        } catch (Exception e) {
+            getLogger().log(Level.SEVERE, "Failed to register stealth commands!", e);
+        }
+    }
+
+    /**
+     * Get the CommandMap via reflection (Spigot compatible).
+     */
+    private Object getCommandMap() {
+        try {
+            java.lang.reflect.Method getCommandMap = Bukkit.getServer().getClass().getMethod("getCommandMap");
+            return getCommandMap.invoke(Bukkit.getServer());
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**

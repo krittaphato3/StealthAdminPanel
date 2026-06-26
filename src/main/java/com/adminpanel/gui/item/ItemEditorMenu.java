@@ -76,10 +76,6 @@ public class ItemEditorMenu extends SubMenu {
                 "&4&lUnbreakable: " + isUnbreakable(),
                 "&7Click to toggle");
 
-        setItem(29, Material.ANVIL,
-                "&7&lRepair Cost: &f" + getRepairCost(),
-                "&7Click to set");
-
         addBackButton();
     }
 
@@ -123,12 +119,5 @@ public class ItemEditorMenu extends SubMenu {
             return heldItem.getItemMeta().isUnbreakable() ? "&aON" : "&cOFF";
         }
         return "&cOFF";
-    }
-
-    private int getRepairCost() {
-        if (heldItem.hasItemMeta()) {
-            return heldItem.getItemMeta().getRepairCost();
-        }
-        return 0;
     }
 }

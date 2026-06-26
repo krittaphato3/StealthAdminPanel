@@ -68,7 +68,7 @@ public class FilterMenu extends PaginationGUI {
         if (item.getType() == Material.LIME_DYE) {
             // Add new filter
             player.closeInventory();
-            new AnvilGUIBridge(plugin).openTextInput(player, "Enter regex pattern", "", (text, event) -> {
+            new AnvilGUIBridge(plugin).openTextInput(player, "Enter regex pattern", "", (text) -> {
                 // After entering pattern, ask for action
                 Bukkit.getScheduler().runTask(plugin, () -> {
                     // Default action: mute

@@ -24,11 +24,18 @@ public class PerformanceMenu extends SubMenu {
 
     @Override
     protected void buildMenu() {
-        // Row 1: TPS & Memory
-        double[] tps = Bukkit.getServer().getTPS();
-        String tps1 = formatTPS(tps[0]);
-        String tps5 = formatTPS(tps[1]);
-        String tps15 = formatTPS(tps[2]);
+        // Row 1: TPS & Memory (use reflection for Paper TPS, fallback to N/A)
+        String tps1 = "&7N/A";
+        String tps5 = "&7N/A";
+        String tps15 = "&7N/A";
+        try {
+            // Try Paper's getTPS() via reflection
+            var tpsMethod = Bukkit.getServer().getClass().getMethod("getTPS");
+            double[] tps = (double[]) tpsMethod.invoke(Bukkit.getServer());
+            tps1 = formatTPS(tps[0]);
+            tps5 = formatTPS(tps[1]);
+            tps15 = formatTPS(tps[2]);
+        } catch (Exception ignored) {}
 
         setItem(10, Material.PAPER,
                 "&e&lTPS (Ticks Per Second)",
@@ -64,7 +71,7 @@ public class PerformanceMenu extends SubMenu {
         for (World world : Bukkit.getWorlds()) {
             if (slot > 35) break;
 
-            int entities = world.getEntityCount();
+            int entities = world.getEntities().size();
             int chunks = world.getLoadedChunks().length;
             int players = world.getPlayers().size();
 

@@ -80,7 +80,7 @@ public class PlayerNotesMenu extends PaginationGUI {
         if (item.getType() == Material.LIME_DYE) {
             // Add note
             player.closeInventory();
-            new AnvilGUIBridge(plugin).openTextInput(player, "Enter note", "", (note, event) -> {
+            new AnvilGUIBridge(plugin).openTextInput(player, "Enter note", "", (note) -> {
                 org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                     plugin.getNoteManager().addNote(
                             target.getName() != null ? target.getName() : target.getUniqueId().toString(),

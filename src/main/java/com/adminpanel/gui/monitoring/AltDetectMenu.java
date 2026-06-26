@@ -3,6 +3,7 @@ package com.adminpanel.gui.monitoring;
 import com.adminpanel.AdminPanel;
 import com.adminpanel.gui.base.PaginationGUI;
 import com.adminpanel.util.HeadUtil;
+import com.adminpanel.util.ItemBuilder;
 import com.adminpanel.util.TextUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -43,13 +44,17 @@ public class AltDetectMenu extends PaginationGUI {
                     names.append("&7• &e").append(name).append("\n");
                 }
 
+                // Build lore list manually
+                List<String> loreList = new ArrayList<>();
+                loreList.add("&7IP: &f" + entry.getKey());
+                loreList.add("&7Players:");
+                for (String name : entry.getValue()) {
+                    loreList.add("&7• &e" + name);
+                }
+
                 items.add(new ItemBuilder(Material.RED_WOOL)
                         .name("&c&l⚠ Alt Accounts Detected")
-                        .lore(
-                                "&7IP: &f" + entry.getKey(),
-                                "&7Players:",
-                                names.toString().split("\n")
-                        )
+                        .lore(loreList)
                         .build());
             }
         }

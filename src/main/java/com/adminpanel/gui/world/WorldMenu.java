@@ -32,7 +32,7 @@ public class WorldMenu extends SubMenu {
                 "&7Current: &f" + world.getTime() + " ticks",
                 "&7Click to cycle: Day → Night → Dawn");
 
-        boolean isStorming = world.isStorming();
+        boolean isStorming = world.hasStorm();
         setItem(12, isStorming ? Material.BLUE_WOOL : Material.YELLOW_WOOL,
                 isStorming ? "&9&lWeather: STORM" : "&e&lWeather: CLEAR",
                 "&7Click to toggle weather");
@@ -46,74 +46,74 @@ public class WorldMenu extends SubMenu {
                 "&7Set time to 13000 (midnight)");
 
         // Row 2: GameRule toggles
-        boolean pvp = world.getGameRuleValue(org.bukkit.GameRule.PVP).equalsIgnoreCase("true");
+        boolean pvp = world.getPVP();
         setItem(19, pvp ? Material.LIME_WOOL : Material.RED_WOOL,
                 ColorUtil.toggleName("PVP", pvp),
                 "&7Click to toggle",
                 "&7Status: " + ColorUtil.stateIndicator(pvp));
 
-        boolean mobSpawn = world.getGameRuleValue(org.bukkit.GameRule.DO_MOB_SPAWNING).equalsIgnoreCase("true");
+        boolean mobSpawn = world.getGameRuleValue(org.bukkit.GameRule.DO_MOB_SPAWNING).booleanValue();
         setItem(20, mobSpawn ? Material.LIME_WOOL : Material.RED_WOOL,
                 ColorUtil.toggleName("Mob Spawning", mobSpawn),
                 "&7Click to toggle",
                 "&7Status: " + ColorUtil.stateIndicator(mobSpawn));
 
-        boolean daylight = world.getGameRuleValue(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE).equalsIgnoreCase("true");
+        boolean daylight = world.getGameRuleValue(org.bukkit.GameRule.DO_DAYLIGHT_CYCLE).booleanValue();
         setItem(21, daylight ? Material.LIME_WOOL : Material.RED_WOOL,
                 ColorUtil.toggleName("Daylight Cycle", daylight),
                 "&7Click to toggle",
                 "&7Status: " + ColorUtil.stateIndicator(daylight));
 
-        boolean weatherCycle = world.getGameRuleValue(org.bukkit.GameRule.DO_WEATHER_CYCLE).equalsIgnoreCase("true");
+        boolean weatherCycle = world.getGameRuleValue(org.bukkit.GameRule.DO_WEATHER_CYCLE).booleanValue();
         setItem(22, weatherCycle ? Material.LIME_WOOL : Material.RED_WOOL,
                 ColorUtil.toggleName("Weather Cycle", weatherCycle),
                 "&7Click to toggle",
                 "&7Status: " + ColorUtil.stateIndicator(weatherCycle));
 
-        boolean fireTick = world.getGameRuleValue(org.bukkit.GameRule.DO_FIRE_TICK).equalsIgnoreCase("true");
+        boolean fireTick = world.getGameRuleValue(org.bukkit.GameRule.DO_FIRE_TICK).booleanValue();
         setItem(23, fireTick ? Material.LIME_WOOL : Material.RED_WOOL,
                 ColorUtil.toggleName("Fire Tick", fireTick),
                 "&7Click to toggle",
                 "&7Status: " + ColorUtil.stateIndicator(fireTick));
 
-        boolean dropItems = world.getGameRuleValue(org.bukkit.GameRule.DO_TILE_DROPS).equalsIgnoreCase("true");
+        boolean dropItems = world.getGameRuleValue(org.bukkit.GameRule.DO_TILE_DROPS).booleanValue();
         setItem(24, dropItems ? Material.LIME_WOOL : Material.RED_WOOL,
                 ColorUtil.toggleName("Tile Drops", dropItems),
                 "&7Click to toggle",
                 "&7Status: " + ColorUtil.stateIndicator(dropItems));
 
         // Row 3: More game rules
-        boolean keepInv = world.getGameRuleValue(org.bukkit.GameRule.KEEP_INVENTORY).equalsIgnoreCase("true");
+        boolean keepInv = world.getGameRuleValue(org.bukkit.GameRule.KEEP_INVENTORY).booleanValue();
         setItem(28, keepInv ? Material.LIME_WOOL : Material.RED_WOOL,
                 ColorUtil.toggleName("Keep Inventory", keepInv),
                 "&7Click to toggle",
                 "&7Status: " + ColorUtil.stateIndicator(keepInv));
 
-        boolean mobGrief = world.getGameRuleValue(org.bukkit.GameRule.MOB_GRIEFING).equalsIgnoreCase("true");
+        boolean mobGrief = world.getGameRuleValue(org.bukkit.GameRule.MOB_GRIEFING).booleanValue();
         setItem(29, mobGrief ? Material.LIME_WOOL : Material.RED_WOOL,
                 ColorUtil.toggleName("Mob Griefing", mobGrief),
                 "&7Click to toggle",
                 "&7Status: " + ColorUtil.stateIndicator(mobGrief));
 
-        boolean announceAdv = world.getGameRuleValue(org.bukkit.GameRule.ANNOUNCE_ADVANCEMENTS).equalsIgnoreCase("true");
+        boolean announceAdv = world.getGameRuleValue(org.bukkit.GameRule.ANNOUNCE_ADVANCEMENTS).booleanValue();
         setItem(30, announceAdv ? Material.LIME_WOOL : Material.RED_WOOL,
                 ColorUtil.toggleName("Announce Advancements", announceAdv),
                 "&7Click to toggle",
                 "&7Status: " + ColorUtil.stateIndicator(announceAdv));
 
-        boolean commandBlock = world.getGameRuleValue(org.bukkit.GameRule.COMMAND_BLOCK_OUTPUT).equalsIgnoreCase("true");
+        boolean commandBlock = world.getGameRuleValue(org.bukkit.GameRule.COMMAND_BLOCK_OUTPUT).booleanValue();
         setItem(31, commandBlock ? Material.LIME_WOOL : Material.RED_WOOL,
                 ColorUtil.toggleName("Command Block Output", commandBlock),
                 "&7Click to toggle",
                 "&7Status: " + ColorUtil.stateIndicator(commandBlock));
 
-        boolean doImmediateRespawn = world.getGameRuleValue(org.bukkit.GameRule.DO_IMMEDIATE_RESPAWN).equalsIgnoreCase("true");
+        boolean doImmediateRespawn = world.getGameRuleValue(org.bukkit.GameRule.DO_IMMEDIATE_RESPAWN).booleanValue();
         setItem(32, doImmediateRespawn ? Material.LIME_WOOL : Material.RED_WOOL,
                 ColorUtil.toggleName("Immediate Respawn", doImmediateRespawn),
                 "&7Click to toggle",
                 "&7Status: " + ColorUtil.stateIndicator(doImmediateRespawn));
 
-        boolean showDeathMessages = world.getGameRuleValue(org.bukkit.GameRule.SHOW_DEATH_MESSAGES).equalsIgnoreCase("true");
+        boolean showDeathMessages = world.getGameRuleValue(org.bukkit.GameRule.SHOW_DEATH_MESSAGES).booleanValue();
         setItem(33, showDeathMessages ? Material.LIME_WOOL : Material.RED_WOOL,
                 ColorUtil.toggleName("Show Death Messages", showDeathMessages),
                 "&7Click to toggle",
@@ -125,7 +125,7 @@ public class WorldMenu extends SubMenu {
                 "&7Name: &f" + world.getName(),
                 "&7Difficulty: &f" + world.getDifficulty(),
                 "&7Players: &f" + world.getPlayers().size(),
-                "&7Entities: &f" + world.getEntityCount(),
+                "&7Entities: &f" + world.getEntities().size(),
                 "&7Chunks: &f" + world.getLoadedChunks().length);
 
         addBackButton();
@@ -153,11 +153,11 @@ public class WorldMenu extends SubMenu {
             }
             case 12 -> {
                 // Toggle weather
-                world.setStorm(!world.isStorming());
+                world.setStorm(!world.hasStorm());
                 player.sendMessage(TextUtil.colorize("&aWeather toggled to " +
-                        (world.isStorming() ? "Storm" : "Clear")));
+                        (world.hasStorm() ? "Storm" : "Clear")));
                 plugin.getAuditManager().log(player, "WORLD_WEATHER", world.getName(),
-                        world.isStorming() ? "Storm" : "Clear");
+                        world.hasStorm() ? "Storm" : "Clear");
                 refresh();
             }
             case 13 -> {
@@ -171,7 +171,13 @@ public class WorldMenu extends SubMenu {
                 refresh();
             }
             // GameRule toggles
-            case 19 -> toggleGameRule(player, org.bukkit.GameRule.PVP);
+            case 19 -> {
+                // PVP uses world.setPVP() in 1.21+
+                world.setPVP(!world.getPVP());
+                player.sendMessage(TextUtil.colorize("&aPVP set to " + world.getPVP()));
+                plugin.getAuditManager().log(player, "GAMERULE", world.getName(), "PVP = " + world.getPVP());
+                refresh();
+            }
             case 20 -> toggleGameRule(player, org.bukkit.GameRule.DO_MOB_SPAWNING);
             case 21 -> toggleGameRule(player, org.bukkit.GameRule.DO_DAYLIGHT_CYCLE);
             case 22 -> toggleGameRule(player, org.bukkit.GameRule.DO_WEATHER_CYCLE);

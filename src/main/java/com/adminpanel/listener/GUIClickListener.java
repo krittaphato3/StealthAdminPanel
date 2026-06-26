@@ -51,7 +51,7 @@ public class GUIClickListener implements Listener {
 
         // Handle PaginationGUI
         if (holder instanceof PaginationGUI paginatedGui) {
-            handlePaginationClick(player, paginatedGui, slot);
+            handlePaginationClick(player, paginatedGui, event);
             return;
         }
 
@@ -65,7 +65,8 @@ public class GUIClickListener implements Listener {
      * Handle clicks in a PaginationGUI.
      * Routes control bar clicks (pagination, search, back) vs item clicks.
      */
-    private void handlePaginationClick(Player player, PaginationGUI gui, int slot) {
+    private void handlePaginationClick(Player player, PaginationGUI gui, InventoryClickEvent event) {
+        int slot = event.getRawSlot();
         // Control bar: slots 45-53
         if (gui.isControlBarSlot(slot)) {
             switch (slot) {

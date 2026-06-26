@@ -83,12 +83,12 @@ public class PresetMenu extends PaginationGUI {
         if (item.getType() == Material.LIME_DYE) {
             // Create new preset
             player.closeInventory();
-            new AnvilGUIBridge(plugin).openTextInput(player, "Preset name", "", (name, event) -> {
+            new AnvilGUIBridge(plugin).openTextInput(player, "Preset name", "", (name) -> {
                 org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                     // Ask for type
-                    new AnvilGUIBridge(plugin).openTextInput(player, "Type (announcement/ban_reason)", "announcement", (type, event2) -> {
+                    new AnvilGUIBridge(plugin).openTextInput(player, "Type (announcement/ban_reason)", "announcement", (type) -> {
                         org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                            new AnvilGUIBridge(plugin).openTextInput(player, "Content", "", (content, event3) -> {
+                            new AnvilGUIBridge(plugin).openTextInput(player, "Content", "", (content) -> {
                                 org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                                     plugin.getPresetManager().save(type, name, content);
                                     player.sendMessage(TextUtil.colorize(

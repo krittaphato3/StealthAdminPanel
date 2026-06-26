@@ -54,7 +54,7 @@ public class AnnouncementMenu extends SubMenu {
                 // Custom announcement
                 player.closeInventory();
                 new AnvilGUIBridge(plugin).openTextInput(player,
-                        "Announcement (use | for lines)", "Hello everyone!", (message, event) -> {
+                        "Announcement (use | for lines)", "Hello everyone!", (message) -> {
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         String prefix = plugin.getConfig().getString("announcement.prefix", "&6&l[Admin] &r");
                         String[] lines = message.split("\\|");
@@ -84,7 +84,7 @@ public class AnnouncementMenu extends SubMenu {
             case 14 -> {
                 // Quick broadcast
                 player.closeInventory();
-                new AnvilGUIBridge(plugin).openTextInput(player, "Quick message", "", (message, event) -> {
+                new AnvilGUIBridge(plugin).openTextInput(player, "Quick message", "", (message) -> {
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         Bukkit.broadcastMessage(TextUtil.colorize(message));
                         player.sendMessage(TextUtil.colorize("&aMessage broadcasted!"));
@@ -95,7 +95,7 @@ public class AnnouncementMenu extends SubMenu {
             case 16 -> {
                 // Alert announcement
                 player.closeInventory();
-                new AnvilGUIBridge(plugin).openTextInput(player, "Alert message", "Server restart in 5 minutes!", (message, event) -> {
+                new AnvilGUIBridge(plugin).openTextInput(player, "Alert message", "Server restart in 5 minutes!", (message) -> {
                     Bukkit.getScheduler().runTask(plugin, () -> {
                         String alertFormat = "&4&l⚠ ALERT ⚠ &c" + message;
                         Bukkit.broadcastMessage(TextUtil.colorize(alertFormat));

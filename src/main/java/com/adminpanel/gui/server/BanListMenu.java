@@ -4,6 +4,8 @@ import com.adminpanel.AdminPanel;
 import com.adminpanel.gui.base.PaginationGUI;
 import com.adminpanel.util.ItemBuilder;
 import com.adminpanel.util.TextUtil;
+import org.bukkit.BanEntry;
+import org.bukkit.BanList;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -11,7 +13,6 @@ import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Date;
 
 /**
  * Server ban list — paginated, searchable.
@@ -27,28 +28,19 @@ public class BanListMenu extends PaginationGUI {
     protected List<ItemStack> getPageItems() {
         List<ItemStack> items = new ArrayList<>();
 
-        for (org.bukkit.BanList banList : Bukkit.getBanLists()) {
-            for (org.bukkit.BanEntry entry : banList.getEntries()) {
-                String name = entry.getTarget();
-                String reason = entry.getReason();
-                Date expires = entry.getExpirationDate();
-                Date created = entry.getCreated();
+        BanList banList = Bukkit.getBanList(BanList.Type.NAME);
+        for (Object obj : banList.getEntries()) {
+            BanEntry<?> entry = (BanEntry<?>) obj;
+            String name = entry.getTarget();
+            String reason = entry.getReason();
 
-                String expiryStr = expires != null ?
-                        "&7Expires: &e" + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(expires) :
-                        "&7Expires: &cPermanent";
-
-                items.add(new ItemBuilder(Material.RED_WOOL)
-                        .name("&c&l" + name)
-                        .lore(
-                                "&7Reason: &f" + (reason != null ? reason : "None"),
-                                expiryStr,
-                                "&7Banned: &f" + (created != null ?
-                                        new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").format(created) : "Unknown"),
-                                "",
-                                "&a&lClick to unban")
-                        .build());
-            }
+            items.add(new ItemBuilder(Material.RED_WOOL)
+                    .name("&c&l" + name)
+                    .lore(
+                            "&7Reason: &f" + (reason != null ? reason : "None"),
+                            "",
+                            "&a&lClick to unban")
+                    .build());
         }
 
         if (items.isEmpty()) {
@@ -68,9 +60,7 @@ public class BanListMenu extends PaginationGUI {
         if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
             String targetName = TextUtil.stripColor(item.getItemMeta().getDisplayName());
             // Unban
-            for (org.bukkit.BanList banList : Bukkit.getBanLists()) {
-                banList.pardon(targetName);
-            }
+            Bukkit.getBanList(BanList.Type.NAME).pardon(targetName);
             // Also unban from plugin database
             plugin.getPunishmentManager().unbanPlayer(targetName);
             player.sendMessage(TextUtil.colorize("&aUnbanned &e" + targetName));

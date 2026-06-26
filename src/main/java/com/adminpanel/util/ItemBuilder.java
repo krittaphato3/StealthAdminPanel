@@ -1,7 +1,5 @@
 package com.adminpanel.util;
 
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.properties.PropertyMap;
 import org.bukkit.Color;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
@@ -11,7 +9,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.LeatherArmorMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
-import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -102,10 +99,10 @@ public class ItemBuilder {
     public ItemBuilder glow(boolean glow) {
         if (meta != null) {
             if (glow) {
-                meta.addEnchant(Enchantment.DURABILITY, 1, true);
+                meta.addEnchant(Enchantment.UNBREAKING, 1, true);
                 meta.addItemFlags(ItemFlag.HIDE_ENCHANTS);
             } else {
-                meta.removeEnchant(Enchantment.DURABILITY);
+                meta.removeEnchant(Enchantment.UNBREAKING);
             }
         }
         return this;
@@ -179,24 +176,6 @@ public class ItemBuilder {
     public ItemBuilder skullOwner(String playerName) {
         if (meta instanceof SkullMeta skullMeta) {
             skullMeta.setOwner(playerName);
-        }
-        return this;
-    }
-
-    /**
-     * Set skull owner via GameProfile with base64 texture.
-     */
-    public ItemBuilder skullTexture(String base64Texture) {
-        if (meta instanceof SkullMeta skullMeta) {
-            GameProfile profile = new GameProfile(UUID.randomUUID(), "AdminPanel");
-            PropertyMap properties = profile.getProperties();
-            properties.put("textures",
-                    new com.mojang.authlib.properties.Property("textures", base64Texture));
-            try {
-                Field profileField = skullMeta.getClass().getDeclaredField("profile");
-                profileField.setAccessible(true);
-                profileField.set(skullMeta, profile);
-            } catch (Exception ignored) {}
         }
         return this;
     }

@@ -105,7 +105,7 @@ public abstract class PaginationGUI implements InventoryHolder {
     /**
      * Handle the back button click. Override to provide custom back navigation.
      */
-    protected void onBackClick() {
+    public void onBackClick() {
         player.closeInventory();
     }
 

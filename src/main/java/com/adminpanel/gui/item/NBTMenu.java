@@ -5,25 +5,28 @@ import com.adminpanel.gui.base.PaginationGUI;
 import com.adminpanel.hooks.AnvilGUIBridge;
 import com.adminpanel.util.ItemBuilder;
 import com.adminpanel.util.TextUtil;
-import de.tr7zw.nbtapi.NBTItem;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.persistence.PersistentDataContainer;
+import org.bukkit.persistence.PersistentDataType;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 /**
- * Advanced NBT editor — view and edit raw NBT tags on an item.
- * Uses Item-NBT-API for full NBT access.
+ * PersistentDataContainer editor — view and edit custom tags on an item.
+ * Uses the built-in Bukkit PersistentDataContainer API (no external dependency).
  */
 public class NBTMenu extends PaginationGUI {
 
     private final ItemStack editingItem;
 
     public NBTMenu(AdminPanel plugin, Player player, ItemStack item) {
-        super(plugin, player, "&0&lNBT Editor");
+        super(plugin, player, "&0&lData Tag Editor");
         this.editingItem = item;
     }
 
@@ -34,45 +37,51 @@ public class NBTMenu extends PaginationGUI {
         // Add new tag button
         items.add(new ItemBuilder(Material.LIME_DYE)
                 .name("&a&l+ Add New Tag")
-                .lore("&7Add a string tag to the item")
+                .lore("&7Add a custom data tag to the item")
                 .build());
 
-        // View raw NBT button
+        // View all tags
         items.add(new ItemBuilder(Material.BOOKSHELF)
-                .name("&9&lView Raw NBT")
-                .lore("&7Display all NBT tags")
+                .name("&9&lView All Tags")
+                .lore("&7Display all custom data tags")
                 .build());
 
         try {
-            NBTItem nbtItem = new NBTItem(editingItem);
-            Set<String> keys = nbtItem.getKeys();
+            ItemMeta meta = editingItem.getItemMeta();
+            if (meta != null) {
+                PersistentDataContainer container = meta.getPersistentDataContainer();
+                Set<NamespacedKey> keys = container.getKeys();
 
-            for (String key : keys) {
-                // Skip internal/boring keys
-                if (key.equals("PublicBukkitValues") || key.startsWith("minecraft:")) continue;
+                for (NamespacedKey key : keys) {
+                    // Show the key and its type
+                    String keyStr = key.toString();
+                    String type = "unknown";
 
-                String value;
-                try {
-                    value = nbtItem.getString(key);
-                    if (value == null || value.isEmpty()) {
-                        value = String.valueOf(nbtItem.getType(key));
+                    if (container.has(key, PersistentDataType.STRING)) {
+                        type = "string: " + truncate(container.get(key, PersistentDataType.STRING), 30);
+                    } else if (container.has(key, PersistentDataType.INTEGER)) {
+                        type = "int: " + container.get(key, PersistentDataType.INTEGER);
+                    } else if (container.has(key, PersistentDataType.DOUBLE)) {
+                        type = "double: " + container.get(key, PersistentDataType.DOUBLE);
+                    } else if (container.has(key, PersistentDataType.BOOLEAN)) {
+                        type = "boolean: " + container.get(key, PersistentDataType.BOOLEAN);
+                    } else if (container.has(key, PersistentDataType.LONG)) {
+                        type = "long: " + container.get(key, PersistentDataType.LONG);
                     }
-                } catch (Exception e) {
-                    value = "complex";
-                }
 
-                items.add(new ItemBuilder(Material.PAPER)
-                        .name("&e" + key)
-                        .lore(
-                                "&7Value: &f" + truncate(value, 40),
-                                "",
-                                "&c&lClick to remove",
-                                "&a&lShift-click to edit")
-                        .build());
+                    items.add(new ItemBuilder(Material.PAPER)
+                            .name("&e" + keyStr)
+                            .lore(
+                                    "&7Type: &f" + type,
+                                    "",
+                                    "&c&lClick to remove",
+                                    "&a&lShift-click to edit")
+                            .build());
+                }
             }
         } catch (Exception e) {
             items.add(new ItemBuilder(Material.BARRIER)
-                    .name("&c&lError reading NBT")
+                    .name("&c&lError reading tags")
                     .lore("&7" + e.getMessage())
                     .build());
         }
@@ -87,24 +96,21 @@ public class NBTMenu extends PaginationGUI {
         if (item.getType() == Material.LIME_DYE) {
             // Add new tag
             player.closeInventory();
-            new AnvilGUIBridge(plugin).openTextInput(player, "Tag Name", "", (tagName, event) -> {
+            new AnvilGUIBridge(plugin).openTextInput(player, "Tag Key (e.g. myplugin:mykey)", "adminpanel:", (keyStr) -> {
                 org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                    new AnvilGUIBridge(plugin).openTextInput(player, "Tag Value", "", (tagValue, event2) -> {
+                    new AnvilGUIBridge(plugin).openTextInput(player, "Tag Value", "", (value) -> {
                         org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                             try {
-                                NBTItem nbtItem = new NBTItem(editingItem);
-                                nbtItem.setString(tagName, tagValue);
-                                ItemStack result = nbtItem.getItem();
-                                editingItem.setItemMeta(result.getItemMeta());
-                                // Copy the NBT data
-                                org.bukkit.inventory.meta.ItemMeta meta = editingItem.getItemMeta();
+                                ItemMeta meta = editingItem.getItemMeta();
                                 if (meta != null) {
-                                    editingItem.setItemMeta(result.getItemMeta());
+                                    NamespacedKey key = new NamespacedKey(plugin, keyStr.replace("adminpanel:", ""));
+                                    meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, value);
+                                    editingItem.setItemMeta(meta);
+                                    player.sendMessage(TextUtil.colorize(
+                                            "&aAdded tag: &f" + keyStr + " &a= &f" + value));
+                                    plugin.getAuditManager().log(player, "ITEM_TAG_ADD",
+                                            editingItem.getType().name(), keyStr + "=" + value);
                                 }
-                                player.sendMessage(TextUtil.colorize(
-                                        "&aAdded tag: &f" + tagName + " &a= &f" + tagValue));
-                                plugin.getAuditManager().log(player, "ITEM_NBT_ADD",
-                                        editingItem.getType().name(), tagName + "=" + tagValue);
                             } catch (Exception e) {
                                 player.sendMessage(TextUtil.colorize("&cError: " + e.getMessage()));
                             }
@@ -117,38 +123,51 @@ public class NBTMenu extends PaginationGUI {
         }
 
         if (item.getType() == Material.BOOKSHELF) {
-            // View raw NBT
+            // View all tags
             player.closeInventory();
-            try {
-                NBTItem nbtItem = new NBTItem(editingItem);
-                String nbt = nbtItem.toString();
-                // Send NBT in chat (split into lines if too long)
-                player.sendMessage(TextUtil.colorize("&6&lRaw NBT Data:"));
-                for (int i = 0; i < nbt.length(); i += 60) {
-                    int end = Math.min(i + 60, nbt.length());
-                    player.sendMessage(TextUtil.colorize("&7" + nbt.substring(i, end)));
+            ItemMeta meta = editingItem.getItemMeta();
+            if (meta != null) {
+                PersistentDataContainer container = meta.getPersistentDataContainer();
+                Set<NamespacedKey> keys = container.getKeys();
+                player.sendMessage(TextUtil.colorize("&6&lCustom Data Tags:"));
+                if (keys.isEmpty()) {
+                    player.sendMessage(TextUtil.colorize("&7No custom tags."));
                 }
-            } catch (Exception e) {
-                player.sendMessage(TextUtil.colorize("&cError reading NBT: " + e.getMessage()));
+                for (NamespacedKey key : keys) {
+                    String value = "complex";
+                    if (container.has(key, PersistentDataType.STRING)) {
+                        value = container.get(key, PersistentDataType.STRING);
+                    } else if (container.has(key, PersistentDataType.INTEGER)) {
+                        value = String.valueOf(container.get(key, PersistentDataType.INTEGER));
+                    } else if (container.has(key, PersistentDataType.DOUBLE)) {
+                        value = String.valueOf(container.get(key, PersistentDataType.DOUBLE));
+                    } else if (container.has(key, PersistentDataType.BOOLEAN)) {
+                        value = String.valueOf(container.get(key, PersistentDataType.BOOLEAN));
+                    }
+                    player.sendMessage(TextUtil.colorize("&7• &e" + key + " &7= &f" + value));
+                }
             }
             return;
         }
 
         // Handle tag actions
         if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
-            String tagName = TextUtil.stripColor(item.getItemMeta().getDisplayName());
+            String keyStr = TextUtil.stripColor(item.getItemMeta().getDisplayName());
 
             if (player.isSneaking()) {
                 // Edit value
                 player.closeInventory();
-                new AnvilGUIBridge(plugin).openTextInput(player, "New value for " + tagName, "", (newValue, event) -> {
+                new AnvilGUIBridge(plugin).openTextInput(player, "New value for " + keyStr, "", (newValue) -> {
                     org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                         try {
-                            NBTItem nbtItem = new NBTItem(editingItem);
-                            nbtItem.setString(tagName, newValue);
-                            editingItem.setItemMeta(nbtItem.getItem().getItemMeta());
-                            player.sendMessage(TextUtil.colorize(
-                                    "&aUpdated &f" + tagName + " &ato &f" + newValue));
+                            ItemMeta meta = editingItem.getItemMeta();
+                            if (meta != null) {
+                                NamespacedKey key = new NamespacedKey(plugin, keyStr.replace("adminpanel:", ""));
+                                meta.getPersistentDataContainer().set(key, PersistentDataType.STRING, newValue);
+                                editingItem.setItemMeta(meta);
+                                player.sendMessage(TextUtil.colorize(
+                                        "&aUpdated &f" + keyStr + " &ato &f" + newValue));
+                            }
                         } catch (Exception e) {
                             player.sendMessage(TextUtil.colorize("&cError: " + e.getMessage()));
                         }
@@ -158,12 +177,15 @@ public class NBTMenu extends PaginationGUI {
             } else {
                 // Remove tag
                 try {
-                    NBTItem nbtItem = new NBTItem(editingItem);
-                    nbtItem.removeKey(tagName);
-                    editingItem.setItemMeta(nbtItem.getItem().getItemMeta());
-                    player.sendMessage(TextUtil.colorize("&cRemoved tag: &f" + tagName));
-                    plugin.getAuditManager().log(player, "ITEM_NBT_REMOVE",
-                            editingItem.getType().name(), tagName);
+                    ItemMeta meta = editingItem.getItemMeta();
+                    if (meta != null) {
+                        NamespacedKey key = new NamespacedKey(plugin, keyStr.replace("adminpanel:", ""));
+                        meta.getPersistentDataContainer().remove(key);
+                        editingItem.setItemMeta(meta);
+                        player.sendMessage(TextUtil.colorize("&cRemoved tag: &f" + keyStr));
+                        plugin.getAuditManager().log(player, "ITEM_TAG_REMOVE",
+                                editingItem.getType().name(), keyStr);
+                    }
                 } catch (Exception e) {
                     player.sendMessage(TextUtil.colorize("&cError: " + e.getMessage()));
                 }
@@ -179,6 +201,6 @@ public class NBTMenu extends PaginationGUI {
 
     @Override
     public String getMenuTitle() {
-        return "&0&lNBT Editor";
+        return "&0&lData Tag Editor";
     }
 }

@@ -58,15 +58,15 @@ public class DisplayMenu extends SubMenu {
 
         // Unbreakable toggle
         boolean unbreakable = meta != null && meta.isUnbreakable();
-        setItem(21, Material.BEDROCK,
+        setItem(19, Material.BEDROCK,
                 unbreakable ? "&a&lUnbreakable: ON" : "&c&lUnbreakable: OFF",
                 "&7Click to toggle");
 
-        // Repair Cost
-        int repairCost = meta != null ? meta.getRepairCost() : 0;
-        setItem(23, Material.ANVIL,
-                "&7&lRepair Cost: &f" + repairCost,
-                "&7Click to set");
+        // Item Flags toggle
+        setItem(21, Material.BARRIER,
+                "&c&lReset All Flags",
+                "&7Remove all item flags",
+                "&7Show all item info");
 
         addBackButton();
     }
@@ -81,7 +81,7 @@ public class DisplayMenu extends SubMenu {
             case 10 -> {
                 // Edit name
                 player.closeInventory();
-                new AnvilGUIBridge(plugin).openTextInput(player, "Enter item name", "", (text, event) -> {
+                new AnvilGUIBridge(plugin).openTextInput(player, "Enter item name", "", (text) -> {
                     org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                         ItemMeta m = editingItem.getItemMeta();
                         if (m != null) {
@@ -96,7 +96,7 @@ public class DisplayMenu extends SubMenu {
             case 12 -> {
                 // Edit lore — simple: enter full lore separated by |
                 player.closeInventory();
-                new AnvilGUIBridge(plugin).openTextInput(player, "Lore (separate lines with |)", "", (text, event) -> {
+                new AnvilGUIBridge(plugin).openTextInput(player, "Lore (separate lines with |)", "", (text) -> {
                     org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
                         ItemMeta m = editingItem.getItemMeta();
                         if (m != null) {
@@ -127,7 +127,7 @@ public class DisplayMenu extends SubMenu {
                     });
                 });
             }
-            case 21 -> {
+            case 19 -> {
                 // Toggle unbreakable
                 if (meta != null) {
                     meta.setUnbreakable(!meta.isUnbreakable());
@@ -141,20 +141,14 @@ public class DisplayMenu extends SubMenu {
                 }
                 refresh();
             }
-            case 23 -> {
-                // Repair Cost
-                player.closeInventory();
-                new AnvilGUIBridge(plugin).openNumberInput(player, "Repair Cost", "0", value -> {
-                    org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
-                        ItemMeta m = editingItem.getItemMeta();
-                        if (m != null) {
-                            m.setRepairCost(value);
-                            editingItem.setItemMeta(m);
-                            player.sendMessage(TextUtil.colorize("&aRepair cost set to &e" + value));
-                        }
-                        refresh();
-                    });
-                });
+            case 21 -> {
+                // Reset all flags
+                if (meta != null) {
+                    meta.removeItemFlags(ItemFlag.values());
+                    editingItem.setItemMeta(meta);
+                    player.sendMessage(TextUtil.colorize("&aAll item flags removed"));
+                }
+                refresh();
             }
             case 45 -> new ItemEditorMenu(plugin, player).open();
         }
