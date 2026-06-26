@@ -20,7 +20,7 @@ import java.lang.management.ManagementFactory;
 public class PerformanceMenu extends SubMenu {
 
     public PerformanceMenu(AdminPanel plugin, Player player) {
-        super(plugin, player, "&0&lServer Performance", 5);
+        super(plugin, player, "&0&lServer Performance", 6);
     }
 
     @Override
