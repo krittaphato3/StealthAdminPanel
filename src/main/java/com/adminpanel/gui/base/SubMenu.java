@@ -2,6 +2,7 @@ package com.adminpanel.gui.base;
 
 import com.adminpanel.AdminPanel;
 import com.adminpanel.util.ItemBuilder;
+import com.adminpanel.util.SoundUtil;
 import com.adminpanel.util.TextUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -49,9 +50,11 @@ public abstract class SubMenu implements InventoryHolder {
     public void handleMenuClick(Player player, ItemStack item, int slot) {
         // Intercept back button clicks
         if (slot == getBackSlot()) {
+            SoundUtil.playNavigate(player);
             onBackClick();
             return;
         }
+        SoundUtil.playClick(player);
         onItemClick(player, item, slot);
     }
 
@@ -125,6 +128,7 @@ public abstract class SubMenu implements InventoryHolder {
             buildMenu();
             initialized = true;
         }
+        SoundUtil.playOpen(player);
         player.openInventory(inventory);
     }
 

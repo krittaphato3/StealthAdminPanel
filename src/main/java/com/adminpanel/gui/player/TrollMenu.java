@@ -3,6 +3,7 @@ package com.adminpanel.gui.player;
 import com.adminpanel.AdminPanel;
 import com.adminpanel.gui.base.SubMenu;
 import com.adminpanel.util.ItemBuilder;
+import com.adminpanel.util.SoundUtil;
 import com.adminpanel.util.TextUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -67,12 +68,14 @@ public class TrollMenu extends SubMenu {
         switch (slot) {
             case 10 -> {
                 // Smite — strike lightning
+                SoundUtil.playDramatic(player);
                 target.getWorld().strikeLightningEffect(target.getLocation());
                 player.sendMessage(TextUtil.colorize("&eSmited " + target.getName() + " with lightning!"));
                 plugin.getAuditManager().log(player, "TROLL_SMITE", target.getName(), "Lightning strike");
             }
             case 11 -> {
                 // Slap — deal damage
+                SoundUtil.playError(player);
                 target.damage(6.0); // 3 hearts
                 player.sendMessage(TextUtil.colorize("&cSlapped " + target.getName() + " for 3 hearts!"));
                 plugin.getAuditManager().log(player, "TROLL_SLAP", target.getName(), "6.0 damage");
@@ -83,6 +86,7 @@ public class TrollMenu extends SubMenu {
                 if (frozen) {
                     target.addPotionEffect(new PotionEffect(PotionEffectType.SLOWNESS, Integer.MAX_VALUE, 255, false, false));
                     target.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, Integer.MAX_VALUE, 200, false, false));
+                    SoundUtil.playLock(player);
                     player.sendMessage(TextUtil.colorize("&bFroze " + target.getName() + "!"));
                 } else {
                     target.removePotionEffect(PotionEffectType.SLOWNESS);
@@ -94,6 +98,7 @@ public class TrollMenu extends SubMenu {
             }
             case 13 -> {
                 // Fake death — play death animation + sound
+                SoundUtil.playDramatic(player);
                 target.getWorld().playSound(target.getLocation(), Sound.ENTITY_PLAYER_DEATH, 1.0f, 1.0f);
                 // Send death message
                 Bukkit.broadcastMessage(TextUtil.colorize("&r" + target.getName() + " was slain by Admin"));
@@ -110,6 +115,7 @@ public class TrollMenu extends SubMenu {
             }
             case 15 -> {
                 // Bounce — launch into air
+                SoundUtil.playDramatic(player);
                 Location loc = target.getLocation();
                 loc.setY(loc.getY() + 0.5);
                 target.teleport(loc);
@@ -119,6 +125,7 @@ public class TrollMenu extends SubMenu {
             }
             case 16 -> {
                 // Lava bath
+                SoundUtil.playDramatic(player);
                 Location loc = target.getLocation();
                 loc.getBlock().setType(Material.LAVA);
                 player.sendMessage(TextUtil.colorize("&6Placed lava at " + target.getName() + "'s feet!"));

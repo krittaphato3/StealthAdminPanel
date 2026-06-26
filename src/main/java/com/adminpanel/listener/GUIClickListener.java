@@ -2,6 +2,7 @@ package com.adminpanel.listener;
 
 import com.adminpanel.AdminPanel;
 import com.adminpanel.gui.MainMenu;
+import com.adminpanel.util.SoundUtil;
 import com.adminpanel.gui.base.PaginationGUI;
 import com.adminpanel.gui.base.SubMenu;
 import com.adminpanel.hooks.AnvilGUIBridge;
@@ -70,11 +71,15 @@ public class GUIClickListener implements Listener {
         // Control bar: slots 45-53
         if (gui.isControlBarSlot(slot)) {
             switch (slot) {
-                case 45 -> gui.previousPage(); // Previous page
-                case 53 -> gui.nextPage();     // Next page
-                case 46 -> gui.onBackClick();  // Back button
+                case 45 -> gui.previousPage(); // Previous page (sound handled in method)
+                case 53 -> gui.nextPage();     // Next page (sound handled in method)
+                case 46 -> {
+                    SoundUtil.playNavigate(player);
+                    gui.onBackClick();  // Back button
+                }
                 case 49 -> {
                     // Search button — open AnvilGUI
+                    SoundUtil.playSearch(player);
                     player.closeInventory();
                     AnvilGUIBridge anvil = new AnvilGUIBridge(plugin);
                     anvil.openSearch(player, gui);

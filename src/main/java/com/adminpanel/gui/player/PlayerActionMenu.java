@@ -8,6 +8,7 @@ import com.adminpanel.hooks.AnvilGUIBridge;
 import com.adminpanel.manager.PermissionManager;
 import com.adminpanel.util.HeadUtil;
 import com.adminpanel.util.ItemBuilder;
+import com.adminpanel.util.SoundUtil;
 import com.adminpanel.util.TextUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -143,11 +144,13 @@ public class PlayerActionMenu extends SubMenu {
             }
             case 31 -> {
                 // Teleport to player
+                SoundUtil.playTeleport(player);
                 player.teleport(target.getLocation());
                 player.sendMessage(TextUtil.colorize("&aTeleported to " + target.getName()));
             }
             case 32 -> {
                 // Kick player
+                SoundUtil.playDestructive(player);
                 target.kickPlayer(TextUtil.colorize("&cKicked by admin."));
                 player.sendMessage(TextUtil.colorize("&aKicked " + target.getName()));
                 plugin.getAuditManager().log(player, "KICK", target.getName(), "Kicked via admin panel");

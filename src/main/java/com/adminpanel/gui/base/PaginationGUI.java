@@ -2,6 +2,7 @@ package com.adminpanel.gui.base;
 
 import com.adminpanel.AdminPanel;
 import com.adminpanel.util.ItemBuilder;
+import com.adminpanel.util.SoundUtil;
 import com.adminpanel.util.TextUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -266,6 +267,7 @@ public abstract class PaginationGUI implements InventoryHolder {
         if (currentPage < totalPages - 1) {
             currentPage++;
             render();
+            SoundUtil.playNavigate(player);
         }
     }
 
@@ -276,6 +278,7 @@ public abstract class PaginationGUI implements InventoryHolder {
         if (currentPage > 0) {
             currentPage--;
             render();
+            SoundUtil.playNavigate(player);
         }
     }
 
@@ -289,6 +292,7 @@ public abstract class PaginationGUI implements InventoryHolder {
             render();
             initialized = true;
         }
+        SoundUtil.playOpen(player);
         player.openInventory(inventory);
     }
 

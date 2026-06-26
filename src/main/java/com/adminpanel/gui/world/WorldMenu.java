@@ -5,6 +5,7 @@ import com.adminpanel.gui.MainMenu;
 import com.adminpanel.gui.base.SubMenu;
 import com.adminpanel.util.ColorUtil;
 import com.adminpanel.util.ItemBuilder;
+import com.adminpanel.util.SoundUtil;
 import com.adminpanel.util.TextUtil;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -200,6 +201,11 @@ public class WorldMenu extends SubMenu {
     private void toggleGameRule(Player player, org.bukkit.GameRule<Boolean> rule) {
         boolean current = world.getGameRuleValue(rule);
         world.setGameRule(rule, !current);
+        if (!current) {
+            SoundUtil.playToggleOn(player);
+        } else {
+            SoundUtil.playToggleOff(player);
+        }
         player.sendMessage(TextUtil.colorize("&a" + rule.getName() + " set to " + (!current)));
         plugin.getAuditManager().log(player, "GAMERULE", world.getName(),
                 rule.getName() + " = " + (!current));
