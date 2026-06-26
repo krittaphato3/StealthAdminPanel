@@ -1,0 +1,39 @@
+# ===========================
+#  StealthAdminPanel Config
+# ===========================
+
+# Sound suppression: cancel inventory open sounds for stealth
+suppress-sounds: true
+
+# Announcement settings
+announcement:
+  prefix: '&6&l[Admin] &r'
+  format: '%prefix% %message%'
+
+# Punishment settings
+punishment:
+  # Number of warnings before auto-temp-ban (0 = disabled)
+  auto-ban-after-warns: 3
+  # Default temp ban duration if not specified
+  default-temp-ban: '7d'
+  # Default temp mute duration
+  default-temp-mute: '30m'
+
+# Chat management
+chat:
+  # Default slow mode cooldown in seconds (0 = disabled)
+  slow-mode-cooldown: 5
+  # Staff chat format
+  staff-chat-format: '&8[&bStaff&8] &e%player%&7: &f%message%'
+
+# Item editor defaults
+item-editor:
+  # Maximum enchantment level allowed (set high for fun)
+  max-enchant-level: 1000000
+
+# Stealth settings
+stealth:
+  # Vanilla "unknown command" message
+  unknown-command-message: 'Unknown command. Type "/help" for help.'
+  # Commands to intercept (in addition to /ap and /adminpanel)
+  extra-intercept-commands: []

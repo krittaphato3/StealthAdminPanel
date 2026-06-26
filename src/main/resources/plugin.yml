@@ -1,0 +1,7 @@
+name: StealthAdminPanel
+version: '1.0.0'
+main: com.adminpanel.AdminPanel
+api-version: '1.16'
+description: A fully stealth admin panel with NBT editor, punishment system, and more
+author: AdminPanelDev
+softdepend: [Vault]
