@@ -1,6 +1,7 @@
 package com.adminpanel.gui.player;
 
 import com.adminpanel.AdminPanel;
+import com.adminpanel.gui.base.ConfirmDialog;
 import com.adminpanel.gui.base.SubMenu;
 import com.adminpanel.gui.economy.BalanceMenu;
 import com.adminpanel.gui.staff.PlayerNotesMenu;
@@ -149,11 +150,17 @@ public class PlayerActionMenu extends SubMenu {
                 player.sendMessage(TextUtil.colorize("&aTeleported to " + target.getName()));
             }
             case 32 -> {
-                // Kick player
-                SoundUtil.playDestructive(player);
-                target.kickPlayer(TextUtil.colorize("&cKicked by admin."));
-                player.sendMessage(TextUtil.colorize("&aKicked " + target.getName()));
-                plugin.getAuditManager().log(player, "KICK", target.getName(), "Kicked via admin panel");
+                // Kick player — confirm first
+                new ConfirmDialog(plugin, player,
+                        "Kick Player",
+                        "&7Are you sure you want to kick &c" + target.getName() + "&7?",
+                        () -> {
+                            target.kickPlayer(TextUtil.colorize("&cKicked by admin."));
+                            player.sendMessage(TextUtil.colorize("&aKicked " + target.getName()));
+                            plugin.getAuditManager().log(player, "KICK", target.getName(), "Kicked via admin panel");
+                        },
+                        null
+                ).open();
             }
         }
     }

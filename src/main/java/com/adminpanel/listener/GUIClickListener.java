@@ -3,6 +3,7 @@ package com.adminpanel.listener;
 import com.adminpanel.AdminPanel;
 import com.adminpanel.gui.MainMenu;
 import com.adminpanel.util.SoundUtil;
+import com.adminpanel.gui.base.ConfirmDialog;
 import com.adminpanel.gui.base.PaginationGUI;
 import com.adminpanel.gui.base.SubMenu;
 import com.adminpanel.hooks.AnvilGUIBridge;
@@ -40,7 +41,8 @@ public class GUIClickListener implements Listener {
         InventoryHolder holder = inventory.getHolder();
 
         // Only handle our custom inventories
-        if (!(holder instanceof PaginationGUI) && !(holder instanceof SubMenu)) return;
+        if (!(holder instanceof PaginationGUI) && !(holder instanceof SubMenu)
+                && !(holder instanceof ConfirmDialog)) return;
 
         // Cancel the click to prevent item movement
         event.setCancelled(true);
@@ -49,6 +51,12 @@ public class GUIClickListener implements Listener {
 
         // Ignore clicks outside the inventory
         if (slot < 0 || slot >= inventory.getSize()) return;
+
+        // Handle ConfirmDialog
+        if (holder instanceof ConfirmDialog dialog) {
+            dialog.handleClick(slot);
+            return;
+        }
 
         // Handle PaginationGUI
         if (holder instanceof PaginationGUI paginatedGui) {

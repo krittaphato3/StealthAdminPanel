@@ -3,9 +3,12 @@ package com.adminpanel.gui.config;
 import com.adminpanel.AdminPanel;
 import com.adminpanel.gui.MainMenu;
 import com.adminpanel.gui.base.SubMenu;
+import com.adminpanel.hooks.AnvilGUIBridge;
 import com.adminpanel.util.ColorUtil;
 import com.adminpanel.util.ItemBuilder;
+import com.adminpanel.util.SoundUtil;
 import com.adminpanel.util.TextUtil;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.entity.Player;
@@ -90,10 +93,50 @@ public class ConfigEditorMenu extends SubMenu {
                 boolean current = config.getBoolean("suppress-sounds", true);
                 config.set("suppress-sounds", !current);
                 plugin.saveConfig();
+                SoundUtil.playToggleOn(player);
                 player.sendMessage(TextUtil.colorize("&aSuppress sounds set to: " + (!current)));
                 plugin.getAuditManager().log(player, "CONFIG_CHANGE", "suppress-sounds",
                         String.valueOf(!current));
                 refresh();
+            }
+            case 12 -> {
+                // Auto-ban threshold
+                player.closeInventory();
+                new AnvilGUIBridge(plugin).openNumberInput(player, "Auto-ban after N warns",
+                        String.valueOf(config.getInt("punishment.auto-ban-after-warns", 3)), value -> {
+                    config.set("punishment.auto-ban-after-warns", value);
+                    plugin.saveConfig();
+                    SoundUtil.playSuccess(player);
+                    player.sendMessage(TextUtil.colorize("&aAuto-ban threshold set to &e" + value));
+                    plugin.getAuditManager().log(player, "CONFIG_CHANGE", "auto-ban-threshold", String.valueOf(value));
+                    Bukkit.getScheduler().runTask(plugin, () -> refresh());
+                });
+            }
+            case 14 -> {
+                // Slow mode cooldown
+                player.closeInventory();
+                new AnvilGUIBridge(plugin).openNumberInput(player, "Slow mode cooldown (seconds)",
+                        String.valueOf(config.getInt("chat.slow-mode-cooldown", 5)), value -> {
+                    config.set("chat.slow-mode-cooldown", value);
+                    plugin.saveConfig();
+                    SoundUtil.playSuccess(player);
+                    player.sendMessage(TextUtil.colorize("&aSlow mode set to &e" + value + "s"));
+                    plugin.getAuditManager().log(player, "CONFIG_CHANGE", "slow-mode", String.valueOf(value));
+                    Bukkit.getScheduler().runTask(plugin, () -> refresh());
+                });
+            }
+            case 16 -> {
+                // Announcement prefix
+                player.closeInventory();
+                new AnvilGUIBridge(plugin).openTextInput(player, "Announcement prefix",
+                        config.getString("announcement.prefix", "&6&l[Admin] &r"), value -> {
+                    config.set("announcement.prefix", value);
+                    plugin.saveConfig();
+                    SoundUtil.playSuccess(player);
+                    player.sendMessage(TextUtil.colorize("&aAnnouncement prefix updated"));
+                    plugin.getAuditManager().log(player, "CONFIG_CHANGE", "announcement-prefix", value);
+                    Bukkit.getScheduler().runTask(plugin, () -> refresh());
+                });
             }
             case 31 -> {
                 // Reload config
