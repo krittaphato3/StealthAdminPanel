@@ -27,11 +27,6 @@ public class EconomyMenu extends SubMenu {
                 "&e&lLeaderboard",
                 "&7Top balances on the server");
 
-        setItem(16, Material.GOLD_INGOT,
-                "&6&lGive / Take",
-                "&7Modify player balances",
-                "&7Click a player to manage");
-
         if (plugin.getEconomyManager() == null || !plugin.getEconomyManager().isAvailable()) {
             setItem(22, Material.BARRIER,
                     "&c&lVault Not Available",

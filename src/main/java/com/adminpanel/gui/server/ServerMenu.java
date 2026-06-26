@@ -38,11 +38,6 @@ public class ServerMenu extends SubMenu {
                 "&7Online: &f" + online,
                 "&7Click to manage (kick/tp)");
 
-        setItem(16, Material.REDSTONE_BLOCK,
-                "&4&lServer Actions",
-                "&7Global announcements",
-                "&7Broadcast messages");
-
         addBackButton();
     }
 

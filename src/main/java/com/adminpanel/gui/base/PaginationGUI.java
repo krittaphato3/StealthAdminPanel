@@ -44,12 +44,14 @@ public abstract class PaginationGUI implements InventoryHolder {
     private static final int ITEMS_PER_PAGE = 45; // 5 rows × 9 columns
     private static final int PAGE_SIZE = 54;       // 6 rows × 9 columns
 
+    private boolean initialized = false;
+
     public PaginationGUI(AdminPanel plugin, Player player, String title) {
         this.plugin = plugin;
         this.player = player;
         this.inventory = Bukkit.createInventory(this, PAGE_SIZE, TextUtil.colorize(title));
-        loadItems();
-        render();
+        // NOTE: loadItems() and render() are NOT called here — subclass fields aren't set yet.
+        // They are called in open() instead, after the subclass constructor completes.
     }
 
     /**
@@ -279,8 +281,14 @@ public abstract class PaginationGUI implements InventoryHolder {
 
     /**
      * Open this inventory for the player.
+     * Builds the menu first to ensure subclass fields are initialized.
      */
     public void open() {
+        if (!initialized) {
+            loadItems();
+            render();
+            initialized = true;
+        }
         player.openInventory(inventory);
     }
 

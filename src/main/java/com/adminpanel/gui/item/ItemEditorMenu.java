@@ -3,6 +3,7 @@ package com.adminpanel.gui.item;
 import com.adminpanel.AdminPanel;
 import com.adminpanel.gui.MainMenu;
 import com.adminpanel.gui.base.SubMenu;
+import com.adminpanel.hooks.AnvilGUIBridge;
 import com.adminpanel.util.TextUtil;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -89,6 +90,23 @@ public class ItemEditorMenu extends SubMenu {
             case 12 -> new DisplayMenu(plugin, player, heldItem).open();
             case 19 -> new NBTMenu(plugin, player, heldItem).open();
             case 20 -> new CommandBindMenu(plugin, player, heldItem).open();
+            case 21 -> {
+                // Damage Override — set custom attack damage via chat input
+                player.closeInventory();
+                new AnvilGUIBridge(plugin).openNumberInput(player, "Custom Attack Damage", "10", damage -> {
+                    org.bukkit.Bukkit.getScheduler().runTask(plugin, () -> {
+                        ItemStack hand = player.getInventory().getItemInMainHand();
+                        if (hand != null && hand.hasItemMeta()) {
+                            org.bukkit.NamespacedKey key = new org.bukkit.NamespacedKey(plugin, "damage");
+                            hand.getItemMeta().getPersistentDataContainer().set(
+                                    key, org.bukkit.persistence.PersistentDataType.DOUBLE, (double) damage);
+                            player.sendMessage(TextUtil.colorize("&aDamage override set to &e" + damage));
+                            plugin.getAuditManager().log(player, "ITEM_DAMAGE", hand.getType().name(),
+                                    "Damage: " + damage);
+                        }
+                    });
+                });
+            }
             case 28 -> {
                 // Toggle unbreakable
                 ItemStack itemInHand = player.getInventory().getItemInMainHand();

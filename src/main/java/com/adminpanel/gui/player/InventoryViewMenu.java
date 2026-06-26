@@ -50,15 +50,15 @@ public class InventoryViewMenu extends SubMenu {
                 .lore("&7Click to view ender chest")
                 .build());
 
-        // Inventory (slots 9-35)
+        // Main inventory (GUI slots 9-35) → contents[9..35]
         ItemStack[] contents = target.getInventory().getContents();
-        for (int i = 0; i < 27 && i + 9 < 36; i++) {
-            setItem(i + 9, contents[i] != null ? contents[i] : ItemBuilder.placeholder());
+        for (int i = 9; i < 36 && i < contents.length; i++) {
+            setItem(i, contents[i] != null ? contents[i] : ItemBuilder.placeholder());
         }
 
-        // Hotbar (slots 36-44)
-        for (int i = 27; i < 36 && i < contents.length; i++) {
-            setItem(i + 9, contents[i] != null ? contents[i] : ItemBuilder.placeholder());
+        // Hotbar (GUI slots 36-44) → contents[0..8]
+        for (int i = 0; i < 9 && i < contents.length; i++) {
+            setItem(i + 36, contents[i] != null ? contents[i] : ItemBuilder.placeholder());
         }
 
         // Control row
@@ -129,10 +129,10 @@ public class InventoryViewMenu extends SubMenu {
      * Convert GUI slot to player inventory slot.
      */
     private int slotToInventorySlot(int guiSlot) {
-        // GUI slots 9-35 → inventory slots 0-26
-        if (guiSlot >= 9 && guiSlot <= 35) return guiSlot - 9;
-        // GUI slots 36-44 → inventory slots 27-35
-        if (guiSlot >= 36 && guiSlot <= 44) return guiSlot - 9;
+        // GUI slots 9-35 → contents[9..35] (main inventory)
+        if (guiSlot >= 9 && guiSlot <= 35) return guiSlot;
+        // GUI slots 36-44 → contents[0..8] (hotbar)
+        if (guiSlot >= 36 && guiSlot <= 44) return guiSlot - 36;
         // Armor slots
         if (guiSlot == 1) return 39; // Helmet
         if (guiSlot == 2) return 38; // Chestplate
