@@ -88,12 +88,27 @@ public class PerformanceMenu extends SubMenu {
             slot++;
         }
 
-        // Row 3: JVM info
+        // Row 3: JVM info + Monitoring sub-menus
         setItem(37, Material.COMMAND_BLOCK,
                 "&9&lJVM Info",
                 "&7Version: &f" + System.getProperty("java.version"),
                 "&7OS: &f" + System.getProperty("os.name"),
                 "&7Cores: &f" + runtime.availableProcessors());
+
+        setItem(38, Material.BOOK,
+                "&b&lSession History",
+                "&7View player join/leave sessions",
+                "&7Playtime, IP tracking");
+
+        setItem(39, Material.RED_WOOL,
+                "&c&lAlt Detection",
+                "&7Find accounts sharing IPs",
+                "&7Online player IP analysis");
+
+        setItem(40, Material.BOOKSHELF,
+                "&6&lAudit Log",
+                "&7View all admin actions",
+                "&7Searchable action trail");
 
         // Auto-refresh indicator
         setItem(49, new ItemBuilder(Material.CLOCK)
@@ -123,10 +138,11 @@ public class PerformanceMenu extends SubMenu {
 
     @Override
     public void onItemClick(Player player, ItemStack item, int slot) {
-        // Navigation
-        if (slot == 45) {
-            if (refreshTask != null) refreshTask.cancel();
-            new MainMenu(plugin, player).open();
+        if (refreshTask != null) refreshTask.cancel();
+        switch (slot) {
+            case 38 -> new SessionMenu(plugin, player).open();
+            case 39 -> new AltDetectMenu(plugin, player).open();
+            case 40 -> new AuditLogMenu(plugin, player).open();
         }
     }
 
