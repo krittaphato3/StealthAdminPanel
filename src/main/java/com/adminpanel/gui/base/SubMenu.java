@@ -22,11 +22,14 @@ public abstract class SubMenu implements InventoryHolder {
     protected final Player player;
     protected final Inventory inventory;
 
+    private boolean initialized = false;
+
     public SubMenu(AdminPanel plugin, Player player, String title, int rows) {
         this.plugin = plugin;
         this.player = player;
         this.inventory = Bukkit.createInventory(this, rows * 9, TextUtil.colorize(title));
-        buildMenu();
+        // NOTE: buildMenu() is NOT called here — subclass fields aren't set yet.
+        // It is called in open() instead, after the subclass constructor completes.
     }
 
     /**
@@ -115,8 +118,13 @@ public abstract class SubMenu implements InventoryHolder {
 
     /**
      * Open this inventory for the player.
+     * Builds the menu first to ensure subclass fields are initialized.
      */
     public void open() {
+        if (!initialized) {
+            buildMenu();
+            initialized = true;
+        }
         player.openInventory(inventory);
     }
 

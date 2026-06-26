@@ -48,16 +48,11 @@ public class PlayerListMenu extends PaginationGUI {
     public void onItemClick(Player player, ItemStack item, int slot) {
         if (item == null || item.getType() != Material.PLAYER_HEAD) return;
 
-        // Extract player name from the display name
         if (item.hasItemMeta() && item.getItemMeta().hasDisplayName()) {
             String displayName = TextUtil.stripColor(item.getItemMeta().getDisplayName());
-            // Remove formatting prefix (&e&l)
-            String targetName = displayName.replaceAll("^[^a-zA-Z0-9_]*", "").trim();
-            // Actually just get the name after the formatting
-            String cleanName = displayName.replaceAll(".*?[\\p{L}\\p{N}_]{3,}", "$0").trim();
-            // Simpler approach: just get online player matching
+            // Find the online player whose name appears in the display name
             for (Player online : Bukkit.getOnlinePlayers()) {
-                if (displayName.contains(online.getName())) {
+                if (online != null && displayName.contains(online.getName())) {
                     new PlayerActionMenu(plugin, player, online).open();
                     return;
                 }
