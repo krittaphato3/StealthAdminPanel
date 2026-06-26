@@ -73,10 +73,12 @@ public class RankMenu extends SubMenu {
                     player.sendMessage(TextUtil.colorize("&cVault permissions not available!"));
                 }
             }
-            case 45 -> {
-                new PlayerActionMenu(plugin, player, target).open();
-            }
         }
+    }
+
+    @Override
+    protected void onBackClick() {
+        new PlayerActionMenu(plugin, player, target).open();
     }
 
     private String getCurrentRank() {

@@ -152,10 +152,11 @@ public class PlayerActionMenu extends SubMenu {
                 player.sendMessage(TextUtil.colorize("&aKicked " + target.getName()));
                 plugin.getAuditManager().log(player, "KICK", target.getName(), "Kicked via admin panel");
             }
-            case 45 -> {
-                // Back button
-                new PlayerListMenu(plugin, player).open();
-            }
         }
+    }
+
+    @Override
+    protected void onBackClick() {
+        new PlayerListMenu(plugin, player).open();
     }
 }

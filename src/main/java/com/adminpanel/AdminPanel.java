@@ -1,6 +1,7 @@
 package com.adminpanel;
 
 import com.adminpanel.command.StealthCommand;
+import com.adminpanel.hooks.AnvilGUIBridge;
 import com.adminpanel.hooks.VaultHook;
 import com.adminpanel.listener.*;
 import com.adminpanel.manager.*;
@@ -61,6 +62,9 @@ public final class AdminPanel extends JavaPlugin {
 
         // Register dynamic commands (stealth - NOT in plugin.yml)
         registerStealthCommands();
+
+        // Initialize AnvilGUI bridge (singleton, registers its own listener)
+        new AnvilGUIBridge(this);
 
         // Register listeners
         registerListeners();

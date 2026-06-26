@@ -53,7 +53,11 @@ public class EconomyMenu extends SubMenu {
         switch (slot) {
             case 10 -> new BalanceMenu(plugin, player).open();
             case 13 -> new LeaderboardMenu(plugin, player).open();
-            case 45 -> new MainMenu(plugin, player).open();
         }
+    }
+
+    @Override
+    protected void onBackClick() {
+        new MainMenu(plugin, player).open();
     }
 }

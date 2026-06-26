@@ -150,6 +150,11 @@ public class EnchantMenu extends PaginationGUI {
     }
 
     @Override
+    public void onBackClick() {
+        new ItemEditorMenu(plugin, player).open();
+    }
+
+    @Override
     public String getMenuTitle() {
         return showCurrentEnchants ? "&0&lCurrent Enchants" : "&0&lAll Enchantments";
     }

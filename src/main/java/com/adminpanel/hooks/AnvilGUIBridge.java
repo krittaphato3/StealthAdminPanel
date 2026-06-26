@@ -4,231 +4,238 @@ import com.adminpanel.AdminPanel;
 import com.adminpanel.gui.base.PaginationGUI;
 import com.adminpanel.util.TextUtil;
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
-import org.bukkit.event.inventory.InventoryClickEvent;
-import org.bukkit.event.inventory.InventoryCloseEvent;
-import org.bukkit.inventory.Inventory;
-import org.bukkit.inventory.InventoryHolder;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
+import org.bukkit.event.player.AsyncPlayerChatEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 /**
- * Lightweight AnvilGUI implementation using Paper/Spigot API.
- * No external AnvilGUI library required.
+ * Lightweight AnvilGUI replacement using chat-based text input.
  *
- * Opens an anvil inventory with a text input field.
- * The player types in the left slot, and the result appears in the output slot.
+ * Since we can't use the external AnvilGUI library (repo unreachable),
+ * this provides text input via a chat prompt system:
+ * 1. Player clicks a search/input button → inventory closes → prompt appears in chat
+ * 2. Player types in chat → input is captured → callback fires
+ * 3. If player sends another command or goes idle, input is cancelled
+ *
+ * This is a singleton — registered once in AdminPanel.onEnable().
+ * All instances use the shared static input map.
  */
 public class AnvilGUIBridge implements Listener {
 
+    private static AnvilGUIBridge instance;
     private final AdminPanel plugin;
 
-    // Track active AnvilGUI sessions
-    private final Map<UUID, AnvilSession> activeSessions = new HashMap<>();
+    // Active input sessions: UUID → Consumer<String>
+    private static final Map<UUID, Consumer<String>> pendingInputs = new ConcurrentHashMap<>();
+
+    // Track who is in an input session so we can intercept chat
+    private static final Map<UUID, Long> inputTimestamps = new ConcurrentHashMap<>();
+
+    // Timeout for input sessions (30 seconds)
+    private static final long INPUT_TIMEOUT_MS = 30_000;
 
     public AnvilGUIBridge(AdminPanel plugin) {
         this.plugin = plugin;
-        Bukkit.getPluginManager().registerEvents(this, plugin);
+        instance = this;
     }
 
     /**
-     * Represents an active AnvilGUI session.
+     * Get the singleton instance.
      */
-    private static class AnvilSession {
-        final Inventory inventory;
-        final Consumer<String> onComplete;
-        final Runnable onClose;
-        final String title;
-
-        AnvilSession(Inventory inventory, Consumer<String> onComplete, Runnable onClose, String title) {
-            this.inventory = inventory;
-            this.onComplete = onComplete;
-            this.onClose = onClose;
-            this.title = title;
-        }
+    public static AnvilGUIBridge getInstance() {
+        return instance;
     }
 
     /**
-     * Open a simple text input AnvilGUI.
+     * Open a text input prompt via chat.
      *
-     * @param player       The player to show the GUI to
-     * @param title        The title of the AnvilGUI
-     * @param defaultText  Default text in the input field
-     * @param onComplete   Called when the player submits text
+     * @param player      The player to prompt
+     * @param title       Title shown in chat
+     * @param defaultText Default suggestion shown in chat
+     * @param onComplete  Called with the entered text on main thread
      */
     public void openTextInput(Player player, String title, String defaultText, Consumer<String> onComplete) {
-        openAnvil(player, title, defaultText, Material.PAPER, onComplete, () -> {});
+        // Close any open inventory
+        player.closeInventory();
+
+        // Show prompt in chat
+        player.sendMessage(TextUtil.colorize("&6&l" + title));
+        player.sendMessage(TextUtil.colorize("&7Type your input in chat. &eDefault: &f" + defaultText));
+        player.sendMessage(TextUtil.colorize("&7Type &c/cancel &7to abort."));
+
+        // Register the input session
+        pendingInputs.put(player.getUniqueId(), onComplete);
+        inputTimestamps.put(player.getUniqueId(), System.currentTimeMillis());
     }
 
     /**
-     * Open an AnvilGUI that searches a PaginationGUI.
+     * Open a search prompt that filters a PaginationGUI.
      */
     public void openSearch(Player player, PaginationGUI gui) {
-        String defaultText = gui.getSearchFilter().isEmpty() ? "" : gui.getSearchFilter();
-        openAnvil(player, "Search...", defaultText, Material.NAME_TAG, (text) -> {
+        player.closeInventory();
+
+        String currentFilter = gui.getSearchFilter();
+        player.sendMessage(TextUtil.colorize("&6&lSearch"));
+        player.sendMessage(TextUtil.colorize("&7Current filter: &f" + (currentFilter.isEmpty() ? "None" : currentFilter)));
+        player.sendMessage(TextUtil.colorize("&7Type your search term in chat."));
+        player.sendMessage(TextUtil.colorize("&7Type &c/cancel &7to clear filter and go back."));
+
+        pendingInputs.put(player.getUniqueId(), (text) -> {
             gui.setSearchFilter(text);
             Bukkit.getScheduler().runTask(plugin, () -> gui.open());
-        }, () -> {
-            Bukkit.getScheduler().runTask(plugin, () -> gui.open());
         });
+        inputTimestamps.put(player.getUniqueId(), System.currentTimeMillis());
     }
 
     /**
-     * Open an AnvilGUI for entering a rank name.
+     * Open a rank input prompt.
      */
     public void openRankInput(Player player, Consumer<String> onComplete) {
         openTextInput(player, "Enter Rank Name", "default", onComplete);
     }
 
     /**
-     * Open an AnvilGUI for entering a reason.
+     * Open a reason input prompt.
      */
     public void openReasonInput(Player player, String defaultReason, Consumer<String> onComplete) {
         openTextInput(player, "Enter Reason", defaultReason, onComplete);
     }
 
     /**
-     * Open an AnvilGUI for entering a duration.
+     * Open a duration input prompt.
      */
     public void openDurationInput(Player player, Consumer<String> onComplete) {
         openTextInput(player, "Duration (e.g. 1h30m, 7d, perm)", "7d", onComplete);
     }
 
     /**
-     * Open an AnvilGUI for entering a number.
+     * Open a number input prompt.
      */
     public void openNumberInput(Player player, String title, String defaultVal, Consumer<Integer> onComplete) {
         openTextInput(player, title, defaultVal, (text) -> {
             try {
                 int value = Integer.parseInt(text.trim());
                 onComplete.accept(value);
-            } catch (NumberFormatException ignored) {}
+            } catch (NumberFormatException e) {
+                player.sendMessage(TextUtil.colorize("&cInvalid number: " + text));
+            }
         });
     }
 
     /**
-     * Open an AnvilGUI for entering a player name.
+     * Open a player name input prompt.
      */
     public void openPlayerNameInput(Player player, String title, Consumer<String> onComplete) {
         openTextInput(player, title, "", onComplete);
     }
 
     /**
-     * Open an AnvilGUI for entering a warp name.
+     * Open a warp name input prompt.
      */
     public void openWarpNameInput(Player player, Consumer<String> onComplete) {
         openTextInput(player, "Enter Warp Name", "", onComplete);
     }
 
     /**
-     * Open an AnvilGUI for entering a preset name.
+     * Open a preset name input prompt.
      */
     public void openPresetNameInput(Player player, Consumer<String> onComplete) {
         openTextInput(player, "Enter Preset Name", "", onComplete);
     }
 
     /**
-     * Core AnvilGUI implementation.
-     * Creates an anvil inventory with a naming-style interface.
+     * Check if a player is currently in an input session.
      */
-    private void openAnvil(Player player, String title, String defaultText, Material icon,
-                           Consumer<String> onComplete, Runnable onClose) {
-        // Create a chest inventory that looks like an anvil interface
-        // Anvil has 3 slots: left (input), right (material), output
-        // We simulate this with a 3-slot "anvil" using a chest inventory
-
-        Inventory inventory = Bukkit.createInventory(null, 27, TextUtil.colorize(title));
-
-        // Slot 10 (center-left): Input item with the text
-        ItemStack inputItem = new ItemStack(icon);
-        ItemMeta inputMeta = inputItem.getItemMeta();
-        if (inputMeta != null) {
-            inputMeta.setDisplayName(TextUtil.colorize("&f" + (defaultText.isEmpty() ? "Type here..." : defaultText)));
-            inputItem.setItemMeta(inputMeta);
-        }
-        inventory.setItem(10, inputItem);
-
-        // Slot 14 (center-right): Arrow/indicator
-        ItemStack arrow = new ItemStack(Material.ARROW);
-        ItemMeta arrowMeta = arrow.getItemMeta();
-        if (arrowMeta != null) {
-            arrowMeta.setDisplayName(TextUtil.colorize("&7Click to submit"));
-            arrow.setItemMeta(arrowMeta);
-        }
-        inventory.setItem(14, arrow);
-
-        // Slot 16 (right): Output item (same as input, representing the result)
-        inventory.setItem(16, inputItem.clone());
-
-        // Store session
-        activeSessions.put(player.getUniqueId(),
-                new AnvilSession(inventory, onComplete, onClose, title));
-
-        // Open the inventory
-        player.openInventory(inventory);
+    public static boolean isInputActive(UUID playerUUID) {
+        return pendingInputs.containsKey(playerUUID);
     }
 
     /**
-     * Handle anvil click — route to session handler.
+     * Handle chat messages — capture input from players in an input session.
      */
-    @EventHandler
-    public void onAnvilClick(InventoryClickEvent event) {
-        if (!(event.getWhoClicked() instanceof Player player)) return;
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onChat(AsyncPlayerChatEvent event) {
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
 
-        AnvilSession session = activeSessions.get(player.getUniqueId());
-        if (session == null) return;
-        if (!event.getInventory().equals(session.inventory)) return;
+        if (!pendingInputs.containsKey(uuid)) return;
 
-        // Cancel all clicks in our anvil GUI
-        event.setCancelled(true);
-
-        int slot = event.getRawSlot();
-
-        // Click on the output slot (16) or arrow (14) = submit
-        if (slot == 16 || slot == 14) {
-            ItemStack inputItem = session.inventory.getItem(10);
-            if (inputItem != null && inputItem.hasItemMeta() && inputItem.getItemMeta().hasDisplayName()) {
-                String text = TextUtil.stripColor(inputItem.getItemMeta().getDisplayName());
-                if ("Type here...".equals(text)) text = "";
-
-                activeSessions.remove(player.getUniqueId());
-                player.closeInventory();
-                session.onComplete.accept(text);
-            }
+        // Check timeout
+        Long timestamp = inputTimestamps.get(uuid);
+        if (timestamp != null && System.currentTimeMillis() - timestamp > INPUT_TIMEOUT_MS) {
+            pendingInputs.remove(uuid);
+            inputTimestamps.remove(uuid);
+            player.sendMessage(TextUtil.colorize("&cInput timed out."));
+            return;
         }
 
-        // Click on the input slot (10) = edit
-        if (slot == 10) {
-            // Close and reopen with input prompt
-            activeSessions.remove(player.getUniqueId());
-            player.closeInventory();
+        String message = event.getMessage().trim();
+        event.setCancelled(true); // Don't broadcast the input
 
-            // Use a simple chat input approach
-            player.sendMessage(TextUtil.colorize("&eType your input in chat (prefix with space):"));
-            // We'll use a simplified approach — just accept the default text
-            // For a full implementation, you'd need a chat listener
-            session.onComplete.accept("");
+        // Handle cancel
+        if (message.equalsIgnoreCase("/cancel") || message.equalsIgnoreCase("cancel")) {
+            pendingInputs.remove(uuid);
+            inputTimestamps.remove(uuid);
+            player.sendMessage(TextUtil.colorize("&cInput cancelled."));
+            return;
+        }
+
+        // Capture input and fire callback on main thread
+        Consumer<String> callback = pendingInputs.remove(uuid);
+        inputTimestamps.remove(uuid);
+
+        if (callback != null) {
+            String finalMessage = message;
+            Bukkit.getScheduler().runTask(plugin, () -> {
+                try {
+                    callback.accept(finalMessage);
+                } catch (Exception e) {
+                    player.sendMessage(TextUtil.colorize("&cError processing input: " + e.getMessage()));
+                }
+            });
         }
     }
 
     /**
-     * Handle inventory close — trigger onClose callback.
+     * Handle commands — cancel input if player types a command instead.
      */
-    @EventHandler
-    public void onAnvilClose(InventoryCloseEvent event) {
-        if (!(event.getPlayer() instanceof Player player)) return;
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onCommand(PlayerCommandPreprocessEvent event) {
+        Player player = event.getPlayer();
+        UUID uuid = player.getUniqueId();
 
-        AnvilSession session = activeSessions.remove(player.getUniqueId());
-        if (session != null) {
-            session.onClose.run();
+        if (!pendingInputs.containsKey(uuid)) return;
+
+        String message = event.getMessage().trim();
+
+        // Allow /cancel to cancel input
+        if (message.equalsIgnoreCase("/cancel")) {
+            event.setCancelled(true);
+            pendingInputs.remove(uuid);
+            inputTimestamps.remove(uuid);
+            player.sendMessage(TextUtil.colorize("&cInput cancelled."));
+            return;
         }
+
+        // Any other command cancels the input
+        pendingInputs.remove(uuid);
+        inputTimestamps.remove(uuid);
+        player.sendMessage(TextUtil.colorize("&cInput cancelled."));
+    }
+
+    /**
+     * Clean up sessions for disconnected players.
+     */
+    public static void cleanup(UUID playerUUID) {
+        pendingInputs.remove(playerUUID);
+        inputTimestamps.remove(playerUUID);
     }
 }

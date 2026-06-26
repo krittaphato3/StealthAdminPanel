@@ -108,4 +108,9 @@ public class ConfigEditorMenu extends SubMenu {
             }
         }
     }
+
+    @Override
+    protected void onBackClick() {
+        new MainMenu(plugin, player).open();
+    }
 }

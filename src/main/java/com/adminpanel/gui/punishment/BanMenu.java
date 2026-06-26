@@ -73,6 +73,11 @@ public class BanMenu extends PaginationGUI {
     }
 
     @Override
+    public void onBackClick() {
+        new PunishmentMenu(plugin, player).open();
+    }
+
+    @Override
     public String getMenuTitle() {
         return "&0&lBan Player";
     }

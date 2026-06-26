@@ -50,19 +50,18 @@ public class DisplayMenu extends SubMenu {
                 "&7Current: &f" + cmd,
                 "&7Click to set");
 
-        // Item Flags
-        setItem(19, Material.BARRIER,
-                "&c&lItem Flags",
-                "&7Control what info is hidden",
-                "&7Currently hiding: &f" + getHiddenFlags());
-
         // Unbreakable toggle
         boolean unbreakable = meta != null && meta.isUnbreakable();
         setItem(19, Material.BEDROCK,
                 unbreakable ? "&a&lUnbreakable: ON" : "&c&lUnbreakable: OFF",
                 "&7Click to toggle");
 
-        // Item Flags toggle
+        // Item Flags display
+        setItem(20, Material.BARRIER,
+                "&c&lHidden Flags",
+                "&7Currently hiding: &f" + getHiddenFlags());
+
+        // Reset all flags
         setItem(21, Material.BARRIER,
                 "&c&lReset All Flags",
                 "&7Remove all item flags",
@@ -150,8 +149,12 @@ public class DisplayMenu extends SubMenu {
                 }
                 refresh();
             }
-            case 45 -> new ItemEditorMenu(plugin, player).open();
         }
+    }
+
+    @Override
+    protected void onBackClick() {
+        new ItemEditorMenu(plugin, player).open();
     }
 
     private String getHiddenFlags() {

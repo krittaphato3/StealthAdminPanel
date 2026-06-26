@@ -1,6 +1,7 @@
 package com.adminpanel.gui.player;
 
 import com.adminpanel.AdminPanel;
+import com.adminpanel.gui.MainMenu;
 import com.adminpanel.gui.base.PaginationGUI;
 import com.adminpanel.util.HeadUtil;
 import com.adminpanel.util.TextUtil;
@@ -62,6 +63,11 @@ public class PlayerListMenu extends PaginationGUI {
                 }
             }
         }
+    }
+
+    @Override
+    public void onBackClick() {
+        new MainMenu(plugin, player).open();
     }
 
     @Override

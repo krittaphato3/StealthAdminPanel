@@ -62,6 +62,11 @@ public class ActivePlayersMenu extends PaginationGUI {
     }
 
     @Override
+    public void onBackClick() {
+        new ServerMenu(plugin, player).open();
+    }
+
+    @Override
     public String getMenuTitle() {
         return "&0&lActive Players";
     }

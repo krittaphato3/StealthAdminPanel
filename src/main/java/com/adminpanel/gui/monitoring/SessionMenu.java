@@ -2,6 +2,7 @@ package com.adminpanel.gui.monitoring;
 
 import com.adminpanel.AdminPanel;
 import com.adminpanel.gui.base.PaginationGUI;
+import com.adminpanel.gui.MainMenu;
 import com.adminpanel.hooks.AnvilGUIBridge;
 import com.adminpanel.util.DurationParser;
 import com.adminpanel.util.HeadUtil;
@@ -84,6 +85,11 @@ public class SessionMenu extends PaginationGUI {
     @Override
     public void onItemClick(Player player, ItemStack item, int slot) {
         // Read-only
+    }
+
+    @Override
+    public void onBackClick() {
+        new MainMenu(plugin, player).open();
     }
 
     @Override

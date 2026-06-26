@@ -189,8 +189,12 @@ public class WorldMenu extends SubMenu {
             case 31 -> toggleGameRule(player, org.bukkit.GameRule.COMMAND_BLOCK_OUTPUT);
             case 32 -> toggleGameRule(player, org.bukkit.GameRule.DO_IMMEDIATE_RESPAWN);
             case 33 -> toggleGameRule(player, org.bukkit.GameRule.SHOW_DEATH_MESSAGES);
-            case 45 -> new MainMenu(plugin, player).open();
         }
+    }
+
+    @Override
+    protected void onBackClick() {
+        new MainMenu(plugin, player).open();
     }
 
     private void toggleGameRule(Player player, org.bukkit.GameRule<Boolean> rule) {

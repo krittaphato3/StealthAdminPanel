@@ -55,9 +55,9 @@ public class GUIClickListener implements Listener {
             return;
         }
 
-        // Handle SubMenu
+        // Handle SubMenu (handleMenuClick intercepts back button automatically)
         if (holder instanceof SubMenu subMenu) {
-            subMenu.onItemClick(player, event.getCurrentItem(), slot);
+            subMenu.handleMenuClick(player, event.getCurrentItem(), slot);
         }
     }
 

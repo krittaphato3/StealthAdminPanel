@@ -85,6 +85,10 @@ public class PunishmentHistoryMenu extends PaginationGUI {
     }
 
     @Override
+    public void onBackClick() {
+        new PunishmentMenu(plugin, player).open();
+    }
+
     public String getMenuTitle() {
         return "&0&lPunishment History";
     }

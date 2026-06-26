@@ -98,7 +98,11 @@ public class ChatMenu extends SubMenu {
             }
             case 16 -> new MuteListMenu(plugin, player).open();
             case 28 -> new FilterMenu(plugin, player).open();
-            case 45 -> new MainMenu(plugin, player).open();
         }
+    }
+
+    @Override
+    protected void onBackClick() {
+        new MainMenu(plugin, player).open();
     }
 }

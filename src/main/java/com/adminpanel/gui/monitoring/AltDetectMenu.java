@@ -86,6 +86,11 @@ public class AltDetectMenu extends PaginationGUI {
     }
 
     @Override
+    public void onBackClick() {
+        new PerformanceMenu(plugin, player).open();
+    }
+
+    @Override
     public String getMenuTitle() {
         return "&0&lAlt Detection";
     }

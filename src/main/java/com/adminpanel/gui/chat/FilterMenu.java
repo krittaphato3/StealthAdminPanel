@@ -69,14 +69,11 @@ public class FilterMenu extends PaginationGUI {
             // Add new filter
             player.closeInventory();
             new AnvilGUIBridge(plugin).openTextInput(player, "Enter regex pattern", "", (text) -> {
-                // After entering pattern, ask for action
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    // Default action: mute
-                    plugin.getDataManager().addChatFilter(text, "mute", "Chat filter violation");
-                    player.sendMessage(TextUtil.colorize("&aAdded filter pattern: &f" + text));
-                    plugin.getAuditManager().log(player, "FILTER_ADD", "Chat", "Pattern: " + text);
-                    Bukkit.getScheduler().runTask(plugin, () -> refresh());
-                });
+                // Default action: mute
+                plugin.getDataManager().addChatFilter(text, "mute", "Chat filter violation");
+                player.sendMessage(TextUtil.colorize("&aAdded filter pattern: &f" + text));
+                plugin.getAuditManager().log(player, "FILTER_ADD", "Chat", "Pattern: " + text);
+                refresh();
             });
             return;
         }
@@ -95,6 +92,11 @@ public class FilterMenu extends PaginationGUI {
                 return;
             }
         }
+    }
+
+    @Override
+    public void onBackClick() {
+        new ChatMenu(plugin, player).open();
     }
 
     @Override

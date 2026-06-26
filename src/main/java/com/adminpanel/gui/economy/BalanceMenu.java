@@ -86,6 +86,11 @@ public class BalanceMenu extends PaginationGUI {
     }
 
     @Override
+    public void onBackClick() {
+        new EconomyMenu(plugin, player).open();
+    }
+
+    @Override
     public String getMenuTitle() {
         return "&0&lPlayer Balances";
     }

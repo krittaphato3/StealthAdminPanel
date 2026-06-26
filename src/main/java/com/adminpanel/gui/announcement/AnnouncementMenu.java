@@ -104,7 +104,11 @@ public class AnnouncementMenu extends SubMenu {
                     });
                 });
             }
-            case 45 -> new MainMenu(plugin, player).open();
         }
+    }
+
+    @Override
+    protected void onBackClick() {
+        new MainMenu(plugin, player).open();
     }
 }

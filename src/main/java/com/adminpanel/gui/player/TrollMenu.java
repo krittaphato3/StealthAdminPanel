@@ -128,10 +128,11 @@ public class TrollMenu extends SubMenu {
                 }, 40L);
                 plugin.getAuditManager().log(player, "TROLL_LAVA", target.getName(), "Lava placement");
             }
-            case 45 -> {
-                // Back
-                new PlayerActionMenu(plugin, player, target).open();
-            }
         }
+    }
+
+    @Override
+    protected void onBackClick() {
+        new PlayerActionMenu(plugin, player, target).open();
     }
 }

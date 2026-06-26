@@ -71,6 +71,11 @@ public class MuteListMenu extends PaginationGUI {
     }
 
     @Override
+    public void onBackClick() {
+        new ChatMenu(plugin, player).open();
+    }
+
+    @Override
     public String getMenuTitle() {
         return "&0&lMuted Players";
     }

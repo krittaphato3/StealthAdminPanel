@@ -37,6 +37,24 @@ public abstract class SubMenu implements InventoryHolder {
 
     /**
      * Handle a click on an item in the menu.
+     * Checks for back button first, then delegates to onItemClick.
+     *
+     * @param player  The player who clicked
+     * @param item    The clicked item
+     * @param slot    The raw slot number
+     */
+    public void handleMenuClick(Player player, ItemStack item, int slot) {
+        // Intercept back button clicks
+        if (slot == getBackSlot()) {
+            onBackClick();
+            return;
+        }
+        onItemClick(player, item, slot);
+    }
+
+    /**
+     * Handle a click on an item in the menu. Subclasses implement this.
+     * Note: Back button is handled by handleMenuClick() — you don't need to handle it here.
      *
      * @param player  The player who clicked
      * @param item    The clicked item

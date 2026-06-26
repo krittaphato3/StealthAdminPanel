@@ -145,6 +145,11 @@ public class CommandBindMenu extends PaginationGUI {
     }
 
     @Override
+    public void onBackClick() {
+        new ItemEditorMenu(plugin, player).open();
+    }
+
+    @Override
     public String getMenuTitle() {
         return "&0&lCommand Binding";
     }

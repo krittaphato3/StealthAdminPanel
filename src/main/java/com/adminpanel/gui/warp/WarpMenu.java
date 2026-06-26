@@ -105,6 +105,11 @@ public class WarpMenu extends PaginationGUI {
     }
 
     @Override
+    public void onBackClick() {
+        new MainMenu(plugin, player).open();
+    }
+
+    @Override
     public String getMenuTitle() {
         return "&0&lWarps";
     }

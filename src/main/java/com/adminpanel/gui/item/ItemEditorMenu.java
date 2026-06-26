@@ -110,8 +110,12 @@ public class ItemEditorMenu extends SubMenu {
                 }
                 refresh();
             }
-            case 45 -> new MainMenu(plugin, player).open();
         }
+    }
+
+    @Override
+    protected void onBackClick() {
+        new MainMenu(plugin, player).open();
     }
 
     private String isUnbreakable() {

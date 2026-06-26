@@ -67,4 +67,9 @@ public class LeaderboardMenu extends SubMenu {
     public void onItemClick(Player player, ItemStack item, int slot) {
         // Read-only leaderboard
     }
+
+    @Override
+    protected void onBackClick() {
+        new EconomyMenu(plugin, player).open();
+    }
 }

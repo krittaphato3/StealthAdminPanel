@@ -51,7 +51,11 @@ public class PunishmentMenu extends SubMenu {
             case 12 -> new MuteMenu(plugin, player).open();
             case 14 -> new WarnMenu(plugin, player).open();
             case 16 -> new PunishmentHistoryMenu(plugin, player).open();
-            case 45 -> new MainMenu(plugin, player).open();
         }
+    }
+
+    @Override
+    protected void onBackClick() {
+        new MainMenu(plugin, player).open();
     }
 }

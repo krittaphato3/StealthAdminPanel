@@ -1,16 +1,17 @@
 package com.adminpanel.listener;
 
 import com.adminpanel.AdminPanel;
+import com.adminpanel.hooks.AnvilGUIBridge;
 import com.adminpanel.manager.SessionManager;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
-import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 /**
  * Tracks player sessions: join times, leave times, IPs, and alt detection.
+ * Also cleans up pending AnvilGUI input sessions on disconnect.
  */
 public class PlayerSessionListener implements Listener {
 
@@ -23,12 +24,6 @@ public class PlayerSessionListener implements Listener {
     }
 
     @EventHandler
-    public void onPreLogin(AsyncPlayerPreLoginEvent event) {
-        // We can log the IP here, but the actual session recording happens on join
-        // because we need a Player object
-    }
-
-    @EventHandler
     public void onJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
         sessionManager.onJoin(player);
@@ -38,5 +33,7 @@ public class PlayerSessionListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         Player player = event.getPlayer();
         sessionManager.onLeave(player);
+        // Clean up any pending AnvilGUI input sessions
+        AnvilGUIBridge.cleanup(player.getUniqueId());
     }
 }

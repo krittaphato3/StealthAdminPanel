@@ -2,6 +2,7 @@ package com.adminpanel.gui.staff;
 
 import com.adminpanel.AdminPanel;
 import com.adminpanel.gui.base.PaginationGUI;
+import com.adminpanel.gui.player.PlayerActionMenu;
 import com.adminpanel.hooks.AnvilGUIBridge;
 import com.adminpanel.util.ItemBuilder;
 import com.adminpanel.util.TextUtil;
@@ -109,6 +110,11 @@ public class PlayerNotesMenu extends PaginationGUI {
                 } catch (Exception ignored) {}
             }
         }
+    }
+
+    @Override
+    public void onBackClick() {
+        new com.adminpanel.gui.player.PlayerListMenu(plugin, player).open();
     }
 
     @Override

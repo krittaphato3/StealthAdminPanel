@@ -62,7 +62,11 @@ public class ServerMenu extends SubMenu {
             }
             case 12 -> new BanListMenu(plugin, player).open();
             case 14 -> new ActivePlayersMenu(plugin, player).open();
-            case 45 -> new MainMenu(plugin, player).open();
         }
+    }
+
+    @Override
+    protected void onBackClick() {
+        new MainMenu(plugin, player).open();
     }
 }
