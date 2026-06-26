@@ -4,6 +4,7 @@ import com.adminpanel.AdminPanel;
 import com.adminpanel.gui.MainMenu;
 import com.adminpanel.gui.base.SubMenu;
 import com.adminpanel.util.ColorUtil;
+import com.adminpanel.util.ItemBuilder;
 import com.adminpanel.util.TextUtil;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -94,15 +95,45 @@ public class PerformanceMenu extends SubMenu {
                 "&7OS: &f" + System.getProperty("os.name"),
                 "&7Cores: &f" + runtime.availableProcessors());
 
+        // Auto-refresh indicator
+        setItem(49, new ItemBuilder(Material.CLOCK)
+                .name("&a&l⟳ Auto-Refresh: ON")
+                .lore("&7Page auto-refreshes every 3 seconds",
+                      "&7Close menu to stop")
+                .build());
+
         addBackButton();
+
+        // Schedule auto-refresh
+        scheduleRefresh();
+    }
+
+    private org.bukkit.scheduler.BukkitTask refreshTask;
+
+    private void scheduleRefresh() {
+        if (refreshTask != null) refreshTask.cancel();
+        refreshTask = org.bukkit.Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            if (player.isOnline() && player.getOpenInventory().getTopInventory().getHolder() == this) {
+                refresh();
+            } else {
+                refreshTask.cancel();
+            }
+        }, 60L, 60L); // Every 3 seconds (60 ticks)
     }
 
     @Override
     public void onItemClick(Player player, ItemStack item, int slot) {
         // Navigation
         if (slot == 45) {
+            if (refreshTask != null) refreshTask.cancel();
             new MainMenu(plugin, player).open();
         }
+    }
+
+    @Override
+    public void onBackClick() {
+        if (refreshTask != null) refreshTask.cancel();
+        new MainMenu(plugin, player).open();
     }
 
     private String formatTPS(double tps) {
