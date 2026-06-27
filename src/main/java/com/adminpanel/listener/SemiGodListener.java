@@ -1,5 +1,7 @@
 package com.adminpanel.listener;
 
+import com.adminpanel.AdminPanel;
+import org.bukkit.Bukkit;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -18,12 +20,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * When enabled, the player:
  * - Takes NO actual damage (all damage cancelled)
- * - Still sees damage effects (knockback, particles, sounds)
+ * - Still sees damage effects (red flash, knockback, particles, sounds)
  * - Is immune to fall damage, fire, drowning, void, etc.
  * - Is immune to hunger (food level stays full)
  * - Gets knockback pushed but health stays full
- *
- * No darkness/fog effects to prevent flickering.
  */
 public class SemiGodListener implements Listener {
 
@@ -60,7 +60,7 @@ public class SemiGodListener implements Listener {
 
         double damage = event.getFinalDamage();
         if (damage > 0) {
-            // Red damage particles (blood-like effect)
+            // Red damage particles
             player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
                     player.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.1);
 
@@ -76,8 +76,12 @@ public class SemiGodListener implements Listener {
             player.getWorld().playSound(player.getLocation(),
                     org.bukkit.Sound.ENTITY_PLAYER_HURT, 0.5f, 1.0f);
 
-            // Brief damage animation via slight camera shake
-            player.damage(0.001);
+            // Schedule red flash on next tick (avoids event recursion)
+            Bukkit.getScheduler().runTask(AdminPanel.getInstance(), () -> {
+                if (player.isOnline()) {
+                    player.damage(0.001);
+                }
+            });
         }
     }
 
@@ -101,6 +105,13 @@ public class SemiGodListener implements Listener {
             // Hit sound
             player.getWorld().playSound(player.getLocation(),
                     org.bukkit.Sound.ENTITY_PLAYER_HURT, 0.3f, 1.0f);
+
+            // Schedule red flash on next tick
+            Bukkit.getScheduler().runTask(AdminPanel.getInstance(), () -> {
+                if (player.isOnline()) {
+                    player.damage(0.001);
+                }
+            });
         }
     }
 
