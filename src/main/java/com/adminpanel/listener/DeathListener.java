@@ -1,6 +1,7 @@
 package com.adminpanel.listener;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -17,28 +18,31 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Tracks player death drops for the /ap restore command.
+ * Tracks player death drops for /ap restore.
  *
  * Flow:
- * 1. Player dies → items saved to memory → items ALSO drop naturally on ground
- * 2. Other players can pick up items (tracked in pickedUpItems set)
- * 3. Admin runs /ap restore → warns about items already picked up
- * 4. If items were picked up, restoring will cause duplication
- * 5. Items destroyed by lava/void are also tracked (cannot restore those)
+ * 1. Player dies → items drop naturally on ground
+ * 2. Items are tracked in memory (index-based)
+ * 3. When someone picks up items, we record WHO took WHAT and HOW MUCH
+ * 4. Admin runs /ap restore → shows full report with warnings
+ * 5. Admin must run /ap restore confirm to actually restore
+ * 6. Restoring creates duplicates if items were already picked up
  */
 public class DeathListener implements Listener {
 
-    // UUID -> dropped items
+    // UUID (dead player) -> list of original drops
     private static final Map<UUID, List<ItemStack>> deathDrops = new ConcurrentHashMap<>();
     private static final Map<UUID, String> deathWorld = new ConcurrentHashMap<>();
     private static final Map<UUID, Long> deathTime = new ConcurrentHashMap<>();
 
-    // Track which items have been picked up by other players
-    // UUID (dead player) -> Set of item indices that were picked up
-    private static final Map<UUID, Set<Integer>> pickedUpIndices = new ConcurrentHashMap<>();
+    // UUID (dead player) -> list of pickup records
+    private static final Map<UUID, List<PickupRecord>> pickupRecords = new ConcurrentHashMap<>();
 
-    // Track which items were destroyed (lava, void)
+    // UUID (dead player) -> set of indices that were destroyed (lava, void, cactus)
     private static final Map<UUID, Set<Integer>> destroyedIndices = new ConcurrentHashMap<>();
+
+    // Pending restore confirmations: UUID (admin) -> target UUID
+    private static final Map<UUID, UUID> pendingRestores = new ConcurrentHashMap<>();
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onPlayerDeath(PlayerDeathEvent event) {
@@ -47,7 +51,7 @@ public class DeathListener implements Listener {
 
         if (drops.isEmpty()) return;
 
-        // Copy the drops BEFORE they drop
+        // Copy the drops
         List<ItemStack> savedDrops = new ArrayList<>();
         for (ItemStack item : drops) {
             if (item != null) {
@@ -58,40 +62,44 @@ public class DeathListener implements Listener {
         deathDrops.put(player.getUniqueId(), savedDrops);
         deathWorld.put(player.getUniqueId(), player.getWorld().getName());
         deathTime.put(player.getUniqueId(), System.currentTimeMillis());
-        pickedUpIndices.put(player.getUniqueId(), ConcurrentHashMap.newKeySet());
+        pickupRecords.put(player.getUniqueId(), new ArrayList<>());
         destroyedIndices.put(player.getUniqueId(), ConcurrentHashMap.newKeySet());
 
-        // Items DROP naturally on the ground (not cleared)
-        // This allows normal pickup behavior and theft detection
+        // Items DROP naturally — not cleared
     }
 
     /**
-     * Track when another player picks up items from a dead player's drops.
+     * Track when someone picks up items from death drops.
      */
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onItemPickup(PlayerPickupItemEvent event) {
         Player picker = event.getPlayer();
         ItemStack pickedUp = event.getItem().getItemStack();
 
-        // Check if this item came from a dead player's drops
         for (Map.Entry<UUID, List<ItemStack>> entry : deathDrops.entrySet()) {
             UUID deadUUID = entry.getKey();
-            if (deadUUID.equals(picker.getUniqueId())) continue; // Picking up own items
+            if (deadUUID.equals(picker.getUniqueId())) continue;
 
             List<ItemStack> originalDrops = entry.getValue();
-            Set<Integer> picked = pickedUpIndices.get(deadUUID);
-            if (picked == null) continue;
+            List<PickupRecord> records = pickupRecords.get(deadUUID);
+            if (records == null) continue;
 
-            // Find matching item in the original drops
             for (int i = 0; i < originalDrops.size(); i++) {
-                if (picked.contains(i)) continue; // Already tracked
-
                 ItemStack original = originalDrops.get(i);
                 if (original.isSimilar(pickedUp) && pickedUp.getAmount() <= original.getAmount()) {
-                    picked.add(i);
+                    // Check if already fully picked up
+                    int alreadyTaken = 0;
+                    for (PickupRecord r : records) {
+                        if (r.itemIndex == i) alreadyTaken += r.amount;
+                    }
 
-                    // Notify online admins
-                    notifyAdmins(deadUUID, picker, original);
+                    int available = original.getAmount() - alreadyTaken;
+                    int toRecord = Math.min(pickedUp.getAmount(), available);
+
+                    if (toRecord > 0) {
+                        records.add(new PickupRecord(i, picker.getUniqueId(), picker.getName(),
+                                pickedUp.getType(), toRecord));
+                    }
                     break;
                 }
             }
@@ -99,65 +107,76 @@ public class DeathListener implements Listener {
     }
 
     /**
-     * Notify admins that items have been picked up (duplication risk).
+     * Check if a specific item index was fully picked up.
      */
-    private void notifyAdmins(UUID deadUUID, Player picker, ItemStack item) {
-        String deadName = Bukkit.getOfflinePlayer(deadUUID).getName();
-        if (deadName == null) deadName = deadUUID.toString().substring(0, 8);
+    public static boolean isFullyPickedUp(UUID deadUUID, int itemIndex) {
+        List<PickupRecord> records = pickupRecords.get(deadUUID);
+        if (records == null) return false;
 
-        String message = org.bukkit.ChatColor.translateAlternateColorCodes('&',
-                "&e[Admin] &c" + picker.getName() + " &7picked up &f" +
-                item.getAmount() + "x " + item.getType().name() +
-                " &7from &e" + deadName + "'s &7death drops." +
-                " &cRestoring will duplicate this item!");
+        List<ItemStack> drops = deathDrops.get(deadUUID);
+        if (drops == null || itemIndex >= drops.size()) return false;
 
-        for (Player admin : Bukkit.getOnlinePlayers()) {
-            if (admin.hasPermission("adminpanel.use") || admin.hasPermission("adminpanel.monitor")) {
-                admin.sendMessage(message);
-            }
+        int totalTaken = 0;
+        for (PickupRecord r : records) {
+            if (r.itemIndex == itemIndex) totalTaken += r.amount;
         }
+        return totalTaken >= drops.get(itemIndex).getAmount();
     }
 
     /**
-     * Get and remove saved drops for a player.
-     * Returns a copy with pickup/destroy status.
+     * Get pickup records for a specific item index.
      */
-    public static RestoreResult retrieveDrops(UUID playerUUID) {
-        List<ItemStack> drops = deathDrops.remove(playerUUID);
-        Set<Integer> picked = pickedUpIndices.remove(playerUUID);
-        Set<Integer> destroyed = destroyedIndices.remove(playerUUID);
-        deathWorld.remove(playerUUID);
-        deathTime.remove(playerUUID);
+    public static List<PickupRecord> getPickupsForItem(UUID deadUUID, int itemIndex) {
+        List<PickupRecord> records = pickupRecords.get(deadUUID);
+        if (records == null) return List.of();
 
-        if (drops == null) return null;
-
-        List<ItemStack> restored = new ArrayList<>();
-        List<String> warnings = new ArrayList<>();
-
-        for (int i = 0; i < drops.size(); i++) {
-            ItemStack item = drops.get(i);
-
-            if (destroyed != null && destroyed.contains(i)) {
-                // Item was destroyed — cannot restore
-                warnings.add("&cLOST: &f" + item.getType().name() + " x" + item.getAmount() +
-                        " &7(destroyed by lava/void)");
-            } else if (picked != null && picked.contains(i)) {
-                // Item was picked up — will duplicate
-                warnings.add("&eDUPLICATE: &f" + item.getType().name() + " x" + item.getAmount() +
-                        " &7(already picked up by another player)");
-                restored.add(item); // Still restore it
-            } else {
-                // Item safe to restore
-                restored.add(item);
-            }
+        List<PickupRecord> result = new ArrayList<>();
+        for (PickupRecord r : records) {
+            if (r.itemIndex == itemIndex) result.add(r);
         }
-
-        return new RestoreResult(restored, warnings);
+        return result;
     }
 
     /**
-     * Check if a player has saved drops.
+     * Get all drops for a player (for preview, doesn't remove).
      */
+    public static List<ItemStack> previewDrops(UUID playerUUID) {
+        return deathDrops.getOrDefault(playerUUID, List.of());
+    }
+
+    /**
+     * Check if there's a pending restore for this admin.
+     */
+    public static UUID getPendingRestore(UUID adminUUID) {
+        return pendingRestores.get(adminUUID);
+    }
+
+    /**
+     * Set a pending restore confirmation.
+     */
+    public static void setPendingRestore(UUID adminUUID, UUID targetUUID) {
+        pendingRestores.put(adminUUID, targetUUID);
+    }
+
+    /**
+     * Clear a pending restore confirmation.
+     */
+    public static void clearPendingRestore(UUID adminUUID) {
+        pendingRestores.remove(adminUUID);
+    }
+
+    /**
+     * Execute the actual restore — returns items and removes from tracking.
+     */
+    public static List<ItemStack> executeRestore(UUID targetUUID) {
+        List<ItemStack> drops = deathDrops.remove(targetUUID);
+        pickupRecords.remove(targetUUID);
+        destroyedIndices.remove(targetUUID);
+        deathWorld.remove(targetUUID);
+        deathTime.remove(targetUUID);
+        return drops != null ? drops : List.of();
+    }
+
     public static boolean hasDrops(UUID playerUUID) {
         return deathDrops.containsKey(playerUUID) && !deathDrops.get(playerUUID).isEmpty();
     }
@@ -174,29 +193,47 @@ public class DeathListener implements Listener {
         return deathDrops;
     }
 
-    public static void clearDrops(UUID playerUUID) {
-        deathDrops.remove(playerUUID);
-        deathWorld.remove(playerUUID);
-        deathTime.remove(playerUUID);
-        pickedUpIndices.remove(playerUUID);
-        destroyedIndices.remove(playerUUID);
+    public static Set<Integer> getDestroyedIndices(UUID playerUUID) {
+        return destroyedIndices.getOrDefault(playerUUID, Set.of());
     }
 
     /**
-     * Result of a restore operation.
+     * Record a pickup for a specific item (used by restore system).
      */
-    public static class RestoreResult {
-        private final List<ItemStack> items;
-        private final List<String> warnings;
+    public static void recordPickup(UUID deadUUID, int itemIndex, UUID pickerUUID, String pickerName,
+                                     Material material, int amount) {
+        List<PickupRecord> records = pickupRecords.computeIfAbsent(deadUUID, k -> new ArrayList<>());
+        records.add(new PickupRecord(itemIndex, pickerUUID, pickerName, material, amount));
+    }
 
-        public RestoreResult(List<ItemStack> items, List<String> warnings) {
-            this.items = items;
-            this.warnings = warnings;
+    /**
+     * Record that an item was destroyed.
+     */
+    public static void recordDestroyed(UUID deadUUID, int itemIndex) {
+        destroyedIndices.computeIfAbsent(deadUUID, k -> ConcurrentHashMap.newKeySet()).add(itemIndex);
+    }
+
+    /**
+     * A record of who picked up what from death drops.
+     */
+    public static class PickupRecord {
+        public final int itemIndex;
+        public final UUID pickerUUID;
+        public final String pickerName;
+        public final Material material;
+        public final int amount;
+
+        public PickupRecord(int itemIndex, UUID pickerUUID, String pickerName, Material material, int amount) {
+            this.itemIndex = itemIndex;
+            this.pickerUUID = pickerUUID;
+            this.pickerName = pickerName;
+            this.material = material;
+            this.amount = amount;
         }
 
-        public List<ItemStack> getItems() { return items; }
-        public List<String> getWarnings() { return warnings; }
-        public boolean hasWarnings() { return !warnings.isEmpty(); }
-        public int getTotalItems() { return items.size(); }
+        @Override
+        public String toString() {
+            return pickerName + " took " + amount + "x " + material.name();
+        }
     }
 }

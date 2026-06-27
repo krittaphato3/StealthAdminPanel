@@ -343,8 +343,21 @@ public class StealthCommand extends Command {
     }
 
     private void handleRestore(Player player, String[] args) {
+        // /ap restore confirm — execute pending restore
+        if (args.length > 0 && args[0].equalsIgnoreCase("confirm")) {
+            UUID pendingTarget = DeathListener.getPendingRestore(player.getUniqueId());
+            if (pendingTarget == null) {
+                SoundUtil.playError(player);
+                player.sendMessage(TextUtil.colorize("&cNo pending restore. Use &e/ap restore <player> &cfirst."));
+                return;
+            }
+            DeathListener.clearPendingRestore(player.getUniqueId());
+            executeRestore(player, pendingTarget);
+            return;
+        }
+
+        // /ap restore — show list of players with saved drops
         if (args.length == 0) {
-            // Show list of players with saved drops
             var allDrops = DeathListener.getAllSavedDrops();
             if (allDrops.isEmpty()) {
                 SoundUtil.playError(player);
@@ -368,7 +381,7 @@ public class StealthCommand extends Command {
             return;
         }
 
-        // Restore a specific player's items
+        // /ap restore <player> — show report and require confirm
         String targetName = args[0];
         org.bukkit.OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
         UUID targetUUID = target.getUniqueId();
@@ -379,28 +392,91 @@ public class StealthCommand extends Command {
             return;
         }
 
-        DeathListener.RestoreResult result = DeathListener.retrieveDrops(targetUUID);
-        if (result == null) {
-            SoundUtil.playError(player);
-            player.sendMessage(TextUtil.colorize("&cNo items to restore for &e" + targetName));
+        showRestoreReport(player, targetUUID, targetName);
+
+        // Store pending confirmation
+        DeathListener.setPendingRestore(player.getUniqueId(), targetUUID);
+    }
+
+    /**
+     * Show the full restore report with pickup details and warnings.
+     */
+    private void showRestoreReport(Player admin, UUID targetUUID, String targetName) {
+        List<ItemStack> drops = DeathListener.previewDrops(targetUUID);
+        Set<Integer> destroyed = DeathListener.getDestroyedIndices(targetUUID);
+
+        if (drops.isEmpty()) {
+            SoundUtil.playError(admin);
+            admin.sendMessage(TextUtil.colorize("&cNo items to restore for &e" + targetName));
             return;
         }
 
-        List<ItemStack> drops = result.getItems();
-        List<String> warnings = result.getWarnings();
+        String world = DeathListener.getDeathWorld(targetUUID);
+        long deathTimeMs = DeathListener.getDeathTime(targetUUID);
+        String timeAgo = formatTimeAgo(System.currentTimeMillis() - deathTimeMs);
 
-        // Show warnings first
-        if (result.hasWarnings()) {
-            player.sendMessage(TextUtil.colorize("&6Restore warnings for &e" + targetName + "&6:"));
-            for (String warning : warnings) {
-                player.sendMessage(TextUtil.colorize("  " + warning));
+        admin.sendMessage("");
+        admin.sendMessage(TextUtil.colorize("&6========== Restore Report: &e" + targetName + " &6=========="));
+        admin.sendMessage(TextUtil.colorize("&7World: &f" + world + " &7| Died: &f" + timeAgo + " ago"));
+        admin.sendMessage(TextUtil.colorize("&7Total items: &f" + drops.size()));
+        admin.sendMessage("");
+
+        int safeCount = 0;
+        int dupeCount = 0;
+        int lostCount = 0;
+
+        for (int i = 0; i < drops.size(); i++) {
+            ItemStack item = drops.get(i);
+            String itemDesc = item.getType().name() + " x" + item.getAmount();
+
+            if (destroyed.contains(i)) {
+                // Item destroyed — cannot restore
+                admin.sendMessage(TextUtil.colorize("&c  LOST: &f" + itemDesc + " &7(destroyed by lava/void)"));
+                lostCount++;
+            } else {
+                // Check if picked up
+                List<DeathListener.PickupRecord> pickups = DeathListener.getPickupsForItem(targetUUID, i);
+                int totalTaken = 0;
+                for (DeathListener.PickupRecord r : pickups) totalTaken += r.amount;
+
+                if (totalTaken > 0) {
+                    // Item was picked up — show by whom
+                    admin.sendMessage(TextUtil.colorize("&e  DUPE RISK: &f" + itemDesc));
+                    for (DeathListener.PickupRecord r : pickups) {
+                        admin.sendMessage(TextUtil.colorize("&7    - Taken by &e" + r.pickerName +
+                                " &7(&f" + r.amount + "x " + r.material.name() + "&7)"));
+                    }
+                    dupeCount++;
+                } else {
+                    // Item safe
+                    admin.sendMessage(TextUtil.colorize("&a  SAFE: &f" + itemDesc));
+                    safeCount++;
+                }
             }
-            player.sendMessage("");
         }
 
+        admin.sendMessage("");
+        admin.sendMessage(TextUtil.colorize("&7Summary: &a" + safeCount + " safe &7| &e" + dupeCount + " dupe risk &7| &c" + lostCount + " lost"));
+
+        if (dupeCount > 0) {
+            admin.sendMessage(TextUtil.colorize("&cWARNING: &7Restoring will DUPLICATE " + dupeCount + " item(s)!"));
+        }
+
+        admin.sendMessage("");
+        admin.sendMessage(TextUtil.colorize("&7Type &e/ap restore confirm &7to proceed, or do nothing to cancel."));
+    }
+
+    /**
+     * Execute the actual restore.
+     */
+    private void executeRestore(Player admin, UUID targetUUID) {
+        org.bukkit.OfflinePlayer target = Bukkit.getOfflinePlayer(targetUUID);
+        String targetName = target.getName() != null ? target.getName() : targetUUID.toString().substring(0, 8);
+
+        List<ItemStack> drops = DeathListener.executeRestore(targetUUID);
         if (drops.isEmpty()) {
-            SoundUtil.playError(player);
-            player.sendMessage(TextUtil.colorize("&cNo restorable items for &e" + targetName + " &c(all destroyed)."));
+            SoundUtil.playError(admin);
+            admin.sendMessage(TextUtil.colorize("&cNo items to restore for &e" + targetName));
             return;
         }
 
@@ -410,20 +486,19 @@ public class StealthCommand extends Command {
             for (ItemStack item : drops) {
                 targetPlayer.getInventory().addItem(item);
             }
-            SoundUtil.playSuccess(player);
-            player.sendMessage(TextUtil.colorize("&aRestored &f" + drops.size() + " items &ato &e" + target.getName()));
+            SoundUtil.playSuccess(admin);
+            admin.sendMessage(TextUtil.colorize("&aRestored &f" + drops.size() + " items &ato &e" + targetName));
             targetPlayer.sendMessage(TextUtil.colorize("&aAn admin has restored your items!"));
         } else {
             for (ItemStack item : drops) {
-                player.getInventory().addItem(item);
+                admin.getInventory().addItem(item);
             }
-            SoundUtil.playSuccess(player);
-            player.sendMessage(TextUtil.colorize("&e" + target.getName() + " &7is offline. Items given to your inventory."));
+            SoundUtil.playSuccess(admin);
+            admin.sendMessage(TextUtil.colorize("&e" + targetName + " &7is offline. Items given to your inventory."));
         }
 
-        plugin.getAuditManager().log(player, "ITEM_RESTORE", targetName,
-                "Restored " + drops.size() + " items" +
-                (result.hasWarnings() ? " (with warnings)" : ""));
+        plugin.getAuditManager().log(admin, "ITEM_RESTORE", targetName,
+                "Restored " + drops.size() + " items");
     }
 
     private String formatTimeAgo(long ms) {
@@ -513,7 +588,13 @@ public class StealthCommand extends Command {
                 }
                 case "gm", "gamemode" -> filterCompletions(
                         List.of("survival", "creative", "adventure", "spectator"), args[1]);
-                case "heal", "feed", "tp", "teleport", "head", "restore" -> {
+                case "restore" -> {
+                    List<String> options = new ArrayList<>();
+                    options.add("confirm");
+                    for (Player p : Bukkit.getOnlinePlayers()) options.add(p.getName());
+                    yield filterCompletions(options, args[1]);
+                }
+                case "heal", "feed", "tp", "teleport", "head" -> {
                     List<String> names = new ArrayList<>();
                     for (Player p : Bukkit.getOnlinePlayers()) names.add(p.getName());
                     yield filterCompletions(names, args[1]);
