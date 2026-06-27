@@ -95,14 +95,36 @@ public class SemiGodListener implements Listener {
         player.getWorld().playSound(player.getLocation(),
                 Sound.ENTITY_PLAYER_HURT, volume, pitch);
 
-        // --- Knockback: correct direction + scales with damage ---
+        // --- Knockback: realistic calculation with armor ---
         if (event.getDamager() != null) {
             org.bukkit.util.Vector direction = player.getLocation().toVector()
                     .subtract(event.getDamager().getLocation().toVector())
                     .normalize();
 
-            double strength = Math.min(damage * 0.12, 0.7);
-            org.bukkit.util.Vector knockback = direction.multiply(strength).setY(0.25);
+            // Base knockback from damage (vanilla-like scaling)
+            double baseKnockback = 0.4 + (damage * 0.08);
+
+            // Armor reduces knockback (like vanilla)
+            double armorReduction = calculateArmorKnockbackReduction(player);
+            baseKnockback *= (1.0 - armorReduction);
+
+            // Knockback enchantment increases knockback
+            double knockbackBonus = 1.0;
+            if (event.getDamager() instanceof Player attacker) {
+                ItemStack weapon = attacker.getInventory().getItemInMainHand();
+                if (weapon.containsEnchantment(org.bukkit.enchantments.Enchantment.KNOCKBACK)) {
+                    knockbackBonus += weapon.getEnchantmentLevel(org.bukkit.enchantments.Enchantment.KNOCKBACK) * 0.3;
+                }
+            }
+            baseKnockback *= knockbackBonus;
+
+            // Cap to prevent flying off the map
+            baseKnockback = Math.min(baseKnockback, 1.5);
+
+            // Vertical component (higher damage = more upward)
+            double verticalBoost = 0.2 + (damage * 0.02);
+
+            org.bukkit.util.Vector knockback = direction.multiply(baseKnockback).setY(verticalBoost);
             player.setVelocity(player.getVelocity().add(knockback));
         }
 
@@ -235,5 +257,54 @@ public class SemiGodListener implements Listener {
             player.setFoodLevel(20);
             player.setSaturation(20f);
         }
+    }
+
+    /**
+     * Calculate knockback reduction from armor.
+     * Returns a value between 0.0 (no armor) and ~0.6 (full netherite).
+     *
+     * Armor reduces knockback in vanilla by reducing the damage,
+     * but in semi god mode we cancel all damage, so we calculate
+     * the reduction manually based on armor points.
+     */
+    private double calculateArmorKnockbackReduction(Player player) {
+        double totalArmor = 0;
+
+        // Helmet
+        ItemStack helmet = player.getInventory().getHelmet();
+        if (helmet != null) totalArmor += getArmorPoints(helmet.getType());
+
+        // Chestplate
+        ItemStack chest = player.getInventory().getChestplate();
+        if (chest != null) totalArmor += getArmorPoints(chest.getType());
+
+        // Leggings
+        ItemStack legs = player.getInventory().getLeggings();
+        if (legs != null) totalArmor += getArmorPoints(legs.getType());
+
+        // Boots
+        ItemStack boots = player.getInventory().getBoots();
+        if (boots != null) totalArmor += getArmorPoints(boots.getType());
+
+        // Max armor is 20 (full netherite/diamond)
+        // At 20 armor, reduce knockback by ~50%
+        // At 0 armor, no reduction
+        return Math.min(totalArmor / 40.0, 0.5);
+    }
+
+    /**
+     * Get armor points for a material type.
+     */
+    private double getArmorPoints(Material material) {
+        return switch (material) {
+            case LEATHER_HELMET, LEATHER_CHESTPLATE, LEATHER_LEGGINGS, LEATHER_BOOTS -> 1;
+            case CHAINMAIL_HELMET, CHAINMAIL_CHESTPLATE, CHAINMAIL_LEGGINGS, CHAINMAIL_BOOTS -> 2;
+            case IRON_HELMET, IRON_CHESTPLATE, IRON_LEGGINGS, IRON_BOOTS -> 2;
+            case DIAMOND_HELMET, DIAMOND_CHESTPLATE, DIAMOND_LEGGINGS, DIAMOND_BOOTS -> 3;
+            case NETHERITE_HELMET, NETHERITE_CHESTPLATE, NETHERITE_LEGGINGS, NETHERITE_BOOTS -> 3;
+            case GOLDEN_HELMET, GOLDEN_CHESTPLATE, GOLDEN_LEGGINGS, GOLDEN_BOOTS -> 2;
+            case TURTLE_HELMET -> 2;
+            default -> 0;
+        };
     }
 }
