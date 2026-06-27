@@ -1,6 +1,5 @@
 package com.adminpanel.listener;
 
-import com.adminpanel.AdminPanel;
 import org.bukkit.Bukkit;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
@@ -11,6 +10,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 
+import java.lang.reflect.Method;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,14 +20,38 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * When enabled, the player:
  * - Takes NO actual damage (all damage cancelled)
- * - Still sees damage effects (red flash, knockback, particles, sounds)
+ * - Still sees damage effects (red flash via NMS packet, knockback, particles, sounds)
  * - Is immune to fall damage, fire, drowning, void, etc.
  * - Is immune to hunger (food level stays full)
  * - Gets knockback pushed but health stays full
+ *
+ * Uses NMS packets for the red flash to avoid infinite damage event loops.
  */
 public class SemiGodListener implements Listener {
 
     private static final Set<UUID> semiGodPlayers = ConcurrentHashMap.newKeySet();
+
+    // Cached NMS methods for hurt animation
+    private static Method playHurtSoundMethod;
+    private static Method getHandleMethod;
+    private static boolean nmsAvailable = false;
+
+    static {
+        try {
+            // Paper 1.21+ has playHurtAnimation on Player
+            getHandleMethod = Bukkit.getPlayer("").getClass().getMethod("getHandle");
+        } catch (Exception ignored) {}
+
+        // Try Paper's playHurtAnimation(float yaw) method
+        try {
+            Method method = Player.class.getMethod("playHurtAnimation", float.class);
+            playHurtSoundMethod = method;
+            nmsAvailable = true;
+        } catch (NoSuchMethodException e) {
+            // Spigot doesn't have playHurtAnimation, fall back to particles only
+            nmsAvailable = false;
+        }
+    }
 
     public static boolean isSemiGod(UUID playerUUID) {
         return semiGodPlayers.contains(playerUUID);
@@ -49,6 +73,31 @@ public class SemiGodListener implements Listener {
     }
 
     /**
+     * Trigger the red flash animation on a player.
+     * Uses Paper's playHurtAnimation if available, otherwise particles only.
+     */
+    private static void playHurtAnimation(Player player) {
+        if (nmsAvailable && playHurtSoundMethod != null) {
+            try {
+                playHurtSoundMethod.invoke(player, player.getLocation().getYaw());
+            } catch (Exception ignored) {
+                // Fallback to particles
+                playHurtParticles(player);
+            }
+        } else {
+            playHurtParticles(player);
+        }
+    }
+
+    /**
+     * Fallback: red damage particles when NMS is not available.
+     */
+    private static void playHurtParticles(Player player) {
+        player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                player.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.1);
+    }
+
+    /**
      * Handle entity damage — cancel damage but apply visual feedback.
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
@@ -60,9 +109,8 @@ public class SemiGodListener implements Listener {
 
         double damage = event.getFinalDamage();
         if (damage > 0) {
-            // Red damage particles
-            player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
-                    player.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.1);
+            // Red flash via NMS packet (safe, no event recursion)
+            playHurtAnimation(player);
 
             // Knockback from attacker
             if (event.getDamager() != null) {
@@ -75,13 +123,6 @@ public class SemiGodListener implements Listener {
             // Hit sound
             player.getWorld().playSound(player.getLocation(),
                     org.bukkit.Sound.ENTITY_PLAYER_HURT, 0.5f, 1.0f);
-
-            // Schedule red flash on next tick (avoids event recursion)
-            Bukkit.getScheduler().runTask(AdminPanel.getInstance(), () -> {
-                if (player.isOnline()) {
-                    player.damage(0.001);
-                }
-            });
         }
     }
 
@@ -98,20 +139,12 @@ public class SemiGodListener implements Listener {
 
         double damage = event.getFinalDamage();
         if (damage > 0) {
-            // Damage particles
-            player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
-                    player.getLocation().add(0, 1, 0), 5, 0.3, 0.3, 0.3, 0.1);
+            // Red flash via NMS packet
+            playHurtAnimation(player);
 
             // Hit sound
             player.getWorld().playSound(player.getLocation(),
                     org.bukkit.Sound.ENTITY_PLAYER_HURT, 0.3f, 1.0f);
-
-            // Schedule red flash on next tick
-            Bukkit.getScheduler().runTask(AdminPanel.getInstance(), () -> {
-                if (player.isOnline()) {
-                    player.damage(0.001);
-                }
-            });
         }
     }
 
