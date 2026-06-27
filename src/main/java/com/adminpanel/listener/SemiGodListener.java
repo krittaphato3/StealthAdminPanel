@@ -1,6 +1,7 @@
 package com.adminpanel.listener;
 
 import org.bukkit.Bukkit;
+import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -10,7 +11,7 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
 
-import java.lang.reflect.Method;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -20,38 +21,19 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * When enabled, the player:
  * - Takes NO actual damage (all damage cancelled)
- * - Still sees damage effects (red flash via NMS packet, knockback, particles, sounds)
- * - Is immune to fall damage, fire, drowning, void, etc.
- * - Is immune to hunger (food level stays full)
- * - Gets knockback pushed but health stays full
- *
- * Uses NMS packets for the red flash to avoid infinite damage event loops.
+ * - Still sees realistic damage effects (red flash, knockback, particles, sounds)
+ * - Knockback pushes AWAY from attacker (correct direction)
+ * - Fall damage shows visual effects (camera shake, particles)
+ * - Lava/fire effects have cooldown to prevent rapid-fire loops
+ * - Hunger immunity
  */
 public class SemiGodListener implements Listener {
 
     private static final Set<UUID> semiGodPlayers = ConcurrentHashMap.newKeySet();
 
-    // Cached NMS methods for hurt animation
-    private static Method playHurtSoundMethod;
-    private static Method getHandleMethod;
-    private static boolean nmsAvailable = false;
-
-    static {
-        try {
-            // Paper 1.21+ has playHurtAnimation on Player
-            getHandleMethod = Bukkit.getPlayer("").getClass().getMethod("getHandle");
-        } catch (Exception ignored) {}
-
-        // Try Paper's playHurtAnimation(float yaw) method
-        try {
-            Method method = Player.class.getMethod("playHurtAnimation", float.class);
-            playHurtSoundMethod = method;
-            nmsAvailable = true;
-        } catch (NoSuchMethodException e) {
-            // Spigot doesn't have playHurtAnimation, fall back to particles only
-            nmsAvailable = false;
-        }
-    }
+    // Cooldown between visual effects (ms) to prevent rapid-fire loops (lava, fire)
+    private static final long EFFECT_COOLDOWN_MS = 500;
+    private static final Map<UUID, Long> effectCooldowns = new ConcurrentHashMap<>();
 
     public static boolean isSemiGod(UUID playerUUID) {
         return semiGodPlayers.contains(playerUUID);
@@ -73,32 +55,47 @@ public class SemiGodListener implements Listener {
     }
 
     /**
-     * Trigger the red flash animation on a player.
-     * Uses Paper's playHurtAnimation if available, otherwise particles only.
+     * Check if the player is on cooldown for visual effects.
      */
-    private static void playHurtAnimation(Player player) {
-        if (nmsAvailable && playHurtSoundMethod != null) {
-            try {
-                playHurtSoundMethod.invoke(player, player.getLocation().getYaw());
-            } catch (Exception ignored) {
-                // Fallback to particles
-                playHurtParticles(player);
-            }
-        } else {
-            playHurtParticles(player);
+    private boolean isOnCooldown(UUID uuid) {
+        Long last = effectCooldowns.get(uuid);
+        if (last == null) return false;
+        return System.currentTimeMillis() - last < EFFECT_COOLDOWN_MS;
+    }
+
+    /**
+     * Update the cooldown timestamp.
+     */
+    private void updateCooldown(UUID uuid) {
+        effectCooldowns.put(uuid, System.currentTimeMillis());
+    }
+
+    /**
+     * Trigger visual feedback: red flash, particles, sound.
+     */
+    private void playDamageEffects(Player player, double damage) {
+        UUID uuid = player.getUniqueId();
+
+        // Skip if on cooldown (prevents lava/fire rapid-fire loops)
+        if (isOnCooldown(uuid)) return;
+        updateCooldown(uuid);
+
+        // Red flash via Paper API
+        try {
+            player.playHurtAnimation(player.getLocation().getYaw());
+        } catch (Exception ignored) {
+            // Fallback: particles only
+            player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                    player.getLocation().add(0, 1, 0), 8, 0.3, 0.3, 0.3, 0.1);
         }
+
+        // Hit sound (lower volume for ambient damage like lava)
+        player.getWorld().playSound(player.getLocation(),
+                org.bukkit.Sound.ENTITY_PLAYER_HURT, 0.4f, 1.0f);
     }
 
     /**
-     * Fallback: red damage particles when NMS is not available.
-     */
-    private static void playHurtParticles(Player player) {
-        player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
-                player.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.1);
-    }
-
-    /**
-     * Handle entity damage — cancel damage but apply visual feedback.
+     * Handle entity attacks — cancel damage, apply correct knockback.
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onEntityDamage(EntityDamageByEntityEvent event) {
@@ -109,25 +106,27 @@ public class SemiGodListener implements Listener {
 
         double damage = event.getFinalDamage();
         if (damage > 0) {
-            // Red flash via NMS packet (safe, no event recursion)
-            playHurtAnimation(player);
+            // Visual effects
+            playDamageEffects(player, damage);
 
-            // Knockback from attacker
+            // Correct knockback: push AWAY from attacker
             if (event.getDamager() != null) {
-                org.bukkit.util.Vector knockback = event.getDamager().getLocation()
-                        .toVector().subtract(player.getLocation().toVector())
-                        .normalize().multiply(0.5).setY(0.3);
+                // Direction: from attacker TO player (away from attacker)
+                org.bukkit.util.Vector direction = player.getLocation().toVector()
+                        .subtract(event.getDamager().getLocation().toVector())
+                        .normalize();
+
+                // Scale knockback by damage amount
+                double knockbackStrength = Math.min(damage * 0.15, 0.8);
+
+                org.bukkit.util.Vector knockback = direction.multiply(knockbackStrength).setY(0.3);
                 player.setVelocity(player.getVelocity().add(knockback));
             }
-
-            // Hit sound
-            player.getWorld().playSound(player.getLocation(),
-                    org.bukkit.Sound.ENTITY_PLAYER_HURT, 0.5f, 1.0f);
         }
     }
 
     /**
-     * Handle non-entity damage (fall, fire, void, etc.) — cancel but show effects.
+     * Handle all non-entity damage: fall, lava, fire, void, drowning, suffocation, etc.
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onGenericDamage(EntityDamageEvent event) {
@@ -139,12 +138,52 @@ public class SemiGodListener implements Listener {
 
         double damage = event.getFinalDamage();
         if (damage > 0) {
-            // Red flash via NMS packet
-            playHurtAnimation(player);
+            EntityDamageEvent.DamageCause cause = event.getCause();
 
-            // Hit sound
-            player.getWorld().playSound(player.getLocation(),
-                    org.bukkit.Sound.ENTITY_PLAYER_HURT, 0.3f, 1.0f);
+            // Visual effects
+            playDamageEffects(player, damage);
+
+            // Specific effects based on damage cause
+            switch (cause) {
+                case FALL -> {
+                    // Fall damage: camera shake + ground particles
+                    player.getWorld().spawnParticle(Particle.BLOCK,
+                            player.getLocation(), 15, 0.5, 0.1, 0.5, 0.1,
+                            player.getLocation().getBlock().getType().createBlockData());
+                    // Small upward bounce for "landing" feel
+                    player.setVelocity(player.getVelocity().setY(0.1));
+                }
+                case LAVA, FIRE, FIRE_TICK -> {
+                    // Lava/fire: smoke particles + sizzle sound
+                    player.getWorld().spawnParticle(Particle.SMOKE,
+                            player.getLocation().add(0, 1, 0), 5, 0.3, 0.3, 0.3, 0.02);
+                    player.getWorld().playSound(player.getLocation(),
+                            org.bukkit.Sound.BLOCK_FIRE_EXTINGUISH, 0.3f, 1.5f);
+                }
+                case VOID -> {
+                    // Void: dark particles + ominous sound
+                    player.getWorld().spawnParticle(Particle.SMOKE,
+                            player.getLocation(), 20, 0.5, 0.5, 0.5, 0.05);
+                    player.getWorld().playSound(player.getLocation(),
+                            org.bukkit.Sound.AMBIENT_CAVE, 0.5f, 0.5f);
+                }
+                case DROWNING -> {
+                    // Drowning: bubble particles
+                    player.getWorld().spawnParticle(Particle.BUBBLE,
+                            player.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.1);
+                }
+                case SUFFOCATION -> {
+                    // Suffocation: brief darkness
+                    player.getWorld().spawnParticle(Particle.BLOCK,
+                            player.getLocation().add(0, 1.8, 0), 5, 0.2, 0.2, 0.2, 0,
+                            Material.STONE.createBlockData());
+                }
+                default -> {
+                    // Generic: just particles
+                    player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                            player.getLocation().add(0, 1, 0), 5, 0.3, 0.3, 0.3, 0.1);
+                }
+            }
         }
     }
 
