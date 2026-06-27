@@ -1,5 +1,6 @@
 package com.adminpanel.listener;
 
+import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -7,8 +8,6 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 
 import java.util.Set;
 import java.util.UUID;
@@ -19,10 +18,12 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * When enabled, the player:
  * - Takes NO actual damage (all damage cancelled)
- * - Still sees damage effects (red tint, knockback, screen shake)
+ * - Still sees damage effects (knockback, particles, sounds)
  * - Is immune to fall damage, fire, drowning, void, etc.
  * - Is immune to hunger (food level stays full)
  * - Gets knockback pushed but health stays full
+ *
+ * No darkness/fog effects to prevent flickering.
  */
 public class SemiGodListener implements Listener {
 
@@ -48,7 +49,7 @@ public class SemiGodListener implements Listener {
     }
 
     /**
-     * Handle entity damage — cancel damage but apply visual knockback.
+     * Handle entity damage — cancel damage but apply visual feedback.
      */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onEntityDamage(EntityDamageByEntityEvent event) {
@@ -59,9 +60,9 @@ public class SemiGodListener implements Listener {
 
         double damage = event.getFinalDamage();
         if (damage > 0) {
-            // Red flash
-            player.addPotionEffect(new PotionEffect(
-                    PotionEffectType.DARKNESS, 5, 0, false, false, false));
+            // Red damage particles (blood-like effect)
+            player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                    player.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.1);
 
             // Knockback from attacker
             if (event.getDamager() != null) {
@@ -74,6 +75,9 @@ public class SemiGodListener implements Listener {
             // Hit sound
             player.getWorld().playSound(player.getLocation(),
                     org.bukkit.Sound.ENTITY_PLAYER_HURT, 0.5f, 1.0f);
+
+            // Brief damage animation via slight camera shake
+            player.damage(0.001);
         }
     }
 
@@ -90,8 +94,11 @@ public class SemiGodListener implements Listener {
 
         double damage = event.getFinalDamage();
         if (damage > 0) {
-            player.addPotionEffect(new PotionEffect(
-                    PotionEffectType.DARKNESS, 5, 0, false, false, false));
+            // Damage particles
+            player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                    player.getLocation().add(0, 1, 0), 5, 0.3, 0.3, 0.3, 0.1);
+
+            // Hit sound
             player.getWorld().playSound(player.getLocation(),
                     org.bukkit.Sound.ENTITY_PLAYER_HURT, 0.3f, 1.0f);
         }
