@@ -97,9 +97,15 @@ public class SemiGodListener implements Listener {
 
         // --- Knockback: realistic calculation with armor ---
         if (event.getDamager() != null) {
-            org.bukkit.util.Vector direction = player.getLocation().toVector()
-                    .subtract(event.getDamager().getLocation().toVector())
-                    .normalize();
+            org.bukkit.util.Vector rawDir = player.getLocation().toVector()
+                    .subtract(event.getDamager().getLocation().toVector());
+
+            // Prevent NaN when attacker and player are at same location
+            if (rawDir.lengthSquared() < 0.001) {
+                rawDir = new org.bukkit.util.Vector(
+                        Math.random() - 0.5, 0, Math.random() - 0.5);
+            }
+            org.bukkit.util.Vector direction = rawDir.normalize();
 
             // Base knockback from damage (vanilla-like scaling)
             double baseKnockback = 0.4 + (damage * 0.08);

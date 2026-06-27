@@ -379,14 +379,32 @@ public class StealthCommand extends Command {
             return;
         }
 
-        List<ItemStack> drops = DeathListener.retrieveDrops(targetUUID);
-        if (drops == null || drops.isEmpty()) {
+        DeathListener.RestoreResult result = DeathListener.retrieveDrops(targetUUID);
+        if (result == null) {
             SoundUtil.playError(player);
             player.sendMessage(TextUtil.colorize("&cNo items to restore for &e" + targetName));
             return;
         }
 
-        // If target is online, give items directly
+        List<ItemStack> drops = result.getItems();
+        List<String> warnings = result.getWarnings();
+
+        // Show warnings first
+        if (result.hasWarnings()) {
+            player.sendMessage(TextUtil.colorize("&6Restore warnings for &e" + targetName + "&6:"));
+            for (String warning : warnings) {
+                player.sendMessage(TextUtil.colorize("  " + warning));
+            }
+            player.sendMessage("");
+        }
+
+        if (drops.isEmpty()) {
+            SoundUtil.playError(player);
+            player.sendMessage(TextUtil.colorize("&cNo restorable items for &e" + targetName + " &c(all destroyed)."));
+            return;
+        }
+
+        // Give items
         Player targetPlayer = Bukkit.getPlayer(targetUUID);
         if (targetPlayer != null && targetPlayer.isOnline()) {
             for (ItemStack item : drops) {
@@ -396,7 +414,6 @@ public class StealthCommand extends Command {
             player.sendMessage(TextUtil.colorize("&aRestored &f" + drops.size() + " items &ato &e" + target.getName()));
             targetPlayer.sendMessage(TextUtil.colorize("&aAn admin has restored your items!"));
         } else {
-            // Target offline -- drop items at their last known location or give to admin
             for (ItemStack item : drops) {
                 player.getInventory().addItem(item);
             }
@@ -405,7 +422,8 @@ public class StealthCommand extends Command {
         }
 
         plugin.getAuditManager().log(player, "ITEM_RESTORE", targetName,
-                "Restored " + drops.size() + " items");
+                "Restored " + drops.size() + " items" +
+                (result.hasWarnings() ? " (with warnings)" : ""));
     }
 
     private String formatTimeAgo(long ms) {
