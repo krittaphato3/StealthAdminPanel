@@ -1,8 +1,8 @@
 package com.adminpanel.listener;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.Particle;
+import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -10,6 +10,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.Map;
 import java.util.Set;
@@ -17,23 +18,24 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Semi God Mode listener.
+ * Semi God Mode listener — realistic damage simulation.
  *
- * When enabled, the player:
- * - Takes NO actual damage (all damage cancelled)
- * - Still sees realistic damage effects (red flash, knockback, particles, sounds)
- * - Knockback pushes AWAY from attacker (correct direction)
- * - Fall damage shows visual effects (camera shake, particles)
- * - Lava/fire effects have cooldown to prevent rapid-fire loops
- * - Hunger immunity
+ * - No actual damage taken
+ * - Knockback pushes AWAY from attacker, scales with damage
+ * - Sound pitch/volume scales with damage amount
+ * - Different effects per damage type
+ * - Cooldown system prevents rapid-fire loops (lava, fire, suffocation)
+ * - Entity attacks feel weighty based on weapon used
  */
 public class SemiGodListener implements Listener {
 
     private static final Set<UUID> semiGodPlayers = ConcurrentHashMap.newKeySet();
 
-    // Cooldown between visual effects (ms) to prevent rapid-fire loops (lava, fire)
-    private static final long EFFECT_COOLDOWN_MS = 500;
-    private static final Map<UUID, Long> effectCooldowns = new ConcurrentHashMap<>();
+    // Separate cooldowns for different damage categories
+    private static final long ENTITY_HIT_COOLDOWN_MS = 300;   // Fast — attacks feel responsive
+    private static final long AMBIENT_COOLDOWN_MS = 800;       // Slow — lava, fire, suffocation
+    private static final Map<UUID, Long> entityCooldowns = new ConcurrentHashMap<>();
+    private static final Map<UUID, Long> ambientCooldowns = new ConcurrentHashMap<>();
 
     public static boolean isSemiGod(UUID playerUUID) {
         return semiGodPlayers.contains(playerUUID);
@@ -54,49 +56,20 @@ public class SemiGodListener implements Listener {
         return semiGodPlayers;
     }
 
-    /**
-     * Check if the player is on cooldown for visual effects.
-     */
-    private boolean isOnCooldown(UUID uuid) {
-        Long last = effectCooldowns.get(uuid);
-        if (last == null) return false;
-        return System.currentTimeMillis() - last < EFFECT_COOLDOWN_MS;
+    private boolean isEntityOnCooldown(UUID uuid) {
+        Long last = entityCooldowns.get(uuid);
+        return last != null && System.currentTimeMillis() - last < ENTITY_HIT_COOLDOWN_MS;
     }
 
-    /**
-     * Update the cooldown timestamp.
-     */
-    private void updateCooldown(UUID uuid) {
-        effectCooldowns.put(uuid, System.currentTimeMillis());
+    private boolean isAmbientOnCooldown(UUID uuid) {
+        Long last = ambientCooldowns.get(uuid);
+        return last != null && System.currentTimeMillis() - last < AMBIENT_COOLDOWN_MS;
     }
 
-    /**
-     * Trigger visual feedback: red flash, particles, sound.
-     */
-    private void playDamageEffects(Player player, double damage) {
-        UUID uuid = player.getUniqueId();
+    // ===========================
+    //  ENTITY ATTACKS (fast cooldown)
+    // ===========================
 
-        // Skip if on cooldown (prevents lava/fire rapid-fire loops)
-        if (isOnCooldown(uuid)) return;
-        updateCooldown(uuid);
-
-        // Red flash via Paper API
-        try {
-            player.playHurtAnimation(player.getLocation().getYaw());
-        } catch (Exception ignored) {
-            // Fallback: particles only
-            player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
-                    player.getLocation().add(0, 1, 0), 8, 0.3, 0.3, 0.3, 0.1);
-        }
-
-        // Hit sound (lower volume for ambient damage like lava)
-        player.getWorld().playSound(player.getLocation(),
-                org.bukkit.Sound.ENTITY_PLAYER_HURT, 0.4f, 1.0f);
-    }
-
-    /**
-     * Handle entity attacks — cancel damage, apply correct knockback.
-     */
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onEntityDamage(EntityDamageByEntityEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
@@ -105,91 +78,153 @@ public class SemiGodListener implements Listener {
         event.setCancelled(true);
 
         double damage = event.getFinalDamage();
-        if (damage > 0) {
-            // Visual effects
-            playDamageEffects(player, damage);
+        if (damage <= 0) return;
 
-            // Correct knockback: push AWAY from attacker
-            if (event.getDamager() != null) {
-                // Direction: from attacker TO player (away from attacker)
-                org.bukkit.util.Vector direction = player.getLocation().toVector()
-                        .subtract(event.getDamager().getLocation().toVector())
-                        .normalize();
+        UUID uuid = player.getUniqueId();
+        if (isEntityOnCooldown(uuid)) return;
+        entityCooldowns.put(uuid, System.currentTimeMillis());
 
-                // Scale knockback by damage amount
-                double knockbackStrength = Math.min(damage * 0.15, 0.8);
+        // --- Red flash ---
+        try {
+            player.playHurtAnimation(player.getLocation().getYaw());
+        } catch (Exception ignored) {}
 
-                org.bukkit.util.Vector knockback = direction.multiply(knockbackStrength).setY(0.3);
-                player.setVelocity(player.getVelocity().add(knockback));
+        // --- Sound scales with damage (higher damage = louder + higher pitch) ---
+        float volume = (float) Math.min(0.3 + (damage / 20.0), 1.0);
+        float pitch = (float) Math.min(0.8 + (damage / 40.0), 1.5);
+        player.getWorld().playSound(player.getLocation(),
+                Sound.ENTITY_PLAYER_HURT, volume, pitch);
+
+        // --- Knockback: correct direction + scales with damage ---
+        if (event.getDamager() != null) {
+            org.bukkit.util.Vector direction = player.getLocation().toVector()
+                    .subtract(event.getDamager().getLocation().toVector())
+                    .normalize();
+
+            double strength = Math.min(damage * 0.12, 0.7);
+            org.bukkit.util.Vector knockback = direction.multiply(strength).setY(0.25);
+            player.setVelocity(player.getVelocity().add(knockback));
+        }
+
+        // --- Particles scale with damage ---
+        int particleCount = (int) Math.min(3 + damage, 20);
+        player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                player.getLocation().add(0, 1, 0), particleCount,
+                0.3, 0.3, 0.3, 0.1);
+
+        // --- Weapon-specific effects ---
+        if (event.getDamager() instanceof Player attacker) {
+            ItemStack weapon = attacker.getInventory().getItemInMainHand();
+            Material type = weapon.getType();
+
+            if (type.name().contains("AXE")) {
+                // Axe: extra particles + heavier sound
+                player.getWorld().spawnParticle(Particle.CRIT,
+                        player.getLocation().add(0, 1, 0), 8, 0.3, 0.3, 0.3, 0.2);
+            } else if (type == Material.TRIDENT) {
+                // Trident: electric particles
+                player.getWorld().spawnParticle(Particle.ELECTRIC_SPARK,
+                        player.getLocation().add(0, 1, 0), 12, 0.3, 0.3, 0.3, 0.1);
+            } else if (type.name().contains("SWORD")) {
+                // Sword: slash particles
+                player.getWorld().spawnParticle(Particle.SWEEP_ATTACK,
+                        player.getLocation().add(0, 1, 0), 3, 0.5, 0.3, 0.5, 0.1);
+            } else if (type == Material.BOW || type == Material.CROSSBOW) {
+                // Arrow: impact particles
+                player.getWorld().spawnParticle(Particle.CRIT,
+                        player.getLocation().add(0, 1, 0), 10, 0.2, 0.2, 0.2, 0.3);
+            } else {
+                // Fist: minimal particles
+                player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                        player.getLocation().add(0, 1, 0), 5, 0.2, 0.2, 0.2, 0.1);
             }
         }
     }
 
-    /**
-     * Handle all non-entity damage: fall, lava, fire, void, drowning, suffocation, etc.
-     */
+    // ===========================
+    //  AMBIENT DAMAGE (slow cooldown — lava, fire, fall, etc.)
+    // ===========================
+
     @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
     public void onGenericDamage(EntityDamageEvent event) {
-        if (event instanceof EntityDamageByEntityEvent) return; // handled above
+        if (event instanceof EntityDamageByEntityEvent) return;
         if (!(event.getEntity() instanceof Player player)) return;
         if (!semiGodPlayers.contains(player.getUniqueId())) return;
 
         event.setCancelled(true);
 
         double damage = event.getFinalDamage();
-        if (damage > 0) {
-            EntityDamageEvent.DamageCause cause = event.getCause();
+        if (damage <= 0) return;
 
-            // Visual effects
-            playDamageEffects(player, damage);
+        UUID uuid = player.getUniqueId();
+        if (isAmbientOnCooldown(uuid)) return;
+        ambientCooldowns.put(uuid, System.currentTimeMillis());
 
-            // Specific effects based on damage cause
-            switch (cause) {
-                case FALL -> {
-                    // Fall damage: camera shake + ground particles
-                    player.getWorld().spawnParticle(Particle.BLOCK,
-                            player.getLocation(), 15, 0.5, 0.1, 0.5, 0.1,
-                            player.getLocation().getBlock().getType().createBlockData());
-                    // Small upward bounce for "landing" feel
-                    player.setVelocity(player.getVelocity().setY(0.1));
-                }
-                case LAVA, FIRE, FIRE_TICK -> {
-                    // Lava/fire: smoke particles + sizzle sound
-                    player.getWorld().spawnParticle(Particle.SMOKE,
-                            player.getLocation().add(0, 1, 0), 5, 0.3, 0.3, 0.3, 0.02);
-                    player.getWorld().playSound(player.getLocation(),
-                            org.bukkit.Sound.BLOCK_FIRE_EXTINGUISH, 0.3f, 1.5f);
-                }
-                case VOID -> {
-                    // Void: dark particles + ominous sound
-                    player.getWorld().spawnParticle(Particle.SMOKE,
-                            player.getLocation(), 20, 0.5, 0.5, 0.5, 0.05);
-                    player.getWorld().playSound(player.getLocation(),
-                            org.bukkit.Sound.AMBIENT_CAVE, 0.5f, 0.5f);
-                }
-                case DROWNING -> {
-                    // Drowning: bubble particles
-                    player.getWorld().spawnParticle(Particle.BUBBLE,
-                            player.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.1);
-                }
-                case SUFFOCATION -> {
-                    // Suffocation: brief darkness
-                    player.getWorld().spawnParticle(Particle.BLOCK,
-                            player.getLocation().add(0, 1.8, 0), 5, 0.2, 0.2, 0.2, 0,
-                            Material.STONE.createBlockData());
-                }
-                default -> {
-                    // Generic: just particles
-                    player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
-                            player.getLocation().add(0, 1, 0), 5, 0.3, 0.3, 0.3, 0.1);
-                }
+        EntityDamageEvent.DamageCause cause = event.getCause();
+
+        // --- Red flash ---
+        try {
+            player.playHurtAnimation(player.getLocation().getYaw());
+        } catch (Exception ignored) {}
+
+        // --- Effect based on cause ---
+        switch (cause) {
+            case FALL -> {
+                int particles = (int) Math.min(5 + damage * 2, 30);
+                player.getWorld().spawnParticle(Particle.BLOCK,
+                        player.getLocation(), particles, 0.5, 0.1, 0.5, 0.1,
+                        player.getLocation().getBlock().getType().createBlockData());
+                player.getWorld().playSound(player.getLocation(),
+                        Sound.ENTITY_PLAYER_HURT, 0.5f, 0.8f);
+                player.setVelocity(player.getVelocity().setY(0.1));
+            }
+            case LAVA, FIRE, FIRE_TICK -> {
+                player.getWorld().spawnParticle(Particle.SMOKE,
+                        player.getLocation().add(0, 1, 0), 5, 0.3, 0.3, 0.3, 0.02);
+                player.getWorld().playSound(player.getLocation(),
+                        Sound.BLOCK_FIRE_EXTINGUISH, 0.2f, 1.5f);
+                player.getWorld().playSound(player.getLocation(),
+                        Sound.ENTITY_PLAYER_HURT, 0.3f, 1.2f);
+            }
+            case VOID -> {
+                player.getWorld().spawnParticle(Particle.SMOKE,
+                        player.getLocation(), 20, 0.5, 0.5, 0.5, 0.05);
+                player.getWorld().playSound(player.getLocation(),
+                        Sound.AMBIENT_CAVE, 0.5f, 0.5f);
+            }
+            case DROWNING -> {
+                player.getWorld().spawnParticle(Particle.BUBBLE,
+                        player.getLocation().add(0, 1, 0), 10, 0.3, 0.3, 0.3, 0.1);
+                player.getWorld().playSound(player.getLocation(),
+                        Sound.ENTITY_PLAYER_HURT, 0.4f, 0.9f);
+            }
+            case SUFFOCATION -> {
+                player.getWorld().spawnParticle(Particle.BLOCK,
+                        player.getLocation().add(0, 1.8, 0), 5, 0.2, 0.2, 0.2, 0,
+                        Material.STONE.createBlockData());
+                player.getWorld().playSound(player.getLocation(),
+                        Sound.ENTITY_PLAYER_HURT, 0.3f, 0.8f);
+            }
+            case CONTACT -> {
+                // Cactus, sweet berry, etc.
+                player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                        player.getLocation().add(0, 1, 0), 5, 0.2, 0.2, 0.2, 0.1);
+                player.getWorld().playSound(player.getLocation(),
+                        Sound.ENTITY_PLAYER_HURT, 0.4f, 1.3f);
+            }
+            default -> {
+                player.getWorld().spawnParticle(Particle.DAMAGE_INDICATOR,
+                        player.getLocation().add(0, 1, 0), 5, 0.3, 0.3, 0.3, 0.1);
+                player.getWorld().playSound(player.getLocation(),
+                        Sound.ENTITY_PLAYER_HURT, 0.3f, 1.0f);
             }
         }
     }
 
-    /**
-     * Cancel hunger damage.
-     */
+    // ===========================
+    //  HUNGER IMMUNITY
+    // ===========================
+
     @EventHandler
     public void onHunger(FoodLevelChangeEvent event) {
         if (!(event.getEntity() instanceof Player player)) return;
