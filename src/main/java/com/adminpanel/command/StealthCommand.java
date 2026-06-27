@@ -2,6 +2,8 @@ package com.adminpanel.command;
 
 import com.adminpanel.AdminPanel;
 import com.adminpanel.gui.MainMenu;
+import com.adminpanel.listener.DeathListener;
+import com.adminpanel.listener.SemiGodListener;
 import com.adminpanel.manager.PermissionManager;
 import com.adminpanel.util.SoundUtil;
 import com.adminpanel.util.TextUtil;
@@ -91,6 +93,8 @@ public class StealthCommand extends Command {
             case "speed" -> handleSpeed(player, subArgs);
             case "clear" -> handleClear(player);
             case "god" -> handleGod(player);
+            case "semigod" -> handleSemiGod(player);
+            case "restore" -> handleRestore(player, subArgs);
             case "tp", "teleport" -> handleTeleport(player, subArgs);
             case "head" -> handleHead(player, subArgs);
             case "anvil" -> handleAnvil(player);
@@ -312,14 +316,108 @@ public class StealthCommand extends Command {
         if (godMode.contains(uuid)) {
             godMode.remove(uuid);
             SoundUtil.playToggleOff(player);
-            player.sendMessage(TextUtil.colorize("&cGod mode: &c✘ OFF"));
+            player.sendMessage(TextUtil.colorize("&cGod mode: &cOFF"));
         } else {
             godMode.add(uuid);
             player.setHealth(player.getMaxHealth());
             player.setFoodLevel(20);
             SoundUtil.playToggleOn(player);
-            player.sendMessage(TextUtil.colorize("&aGod mode: &a✔ ON"));
+            player.sendMessage(TextUtil.colorize("&aGod mode: &aON"));
         }
+    }
+
+    private void handleSemiGod(Player player) {
+        boolean wasEnabled = SemiGodListener.isSemiGod(player.getUniqueId());
+        boolean nowEnabled = SemiGodListener.toggleSemiGod(player);
+
+        if (nowEnabled) {
+            player.setHealth(player.getMaxHealth());
+            player.setFoodLevel(20);
+            SoundUtil.playToggleOn(player);
+            player.sendMessage(TextUtil.colorize("&aSemi God Mode: &aON"));
+            player.sendMessage(TextUtil.colorize("&7You take no damage but still see effects (knockback, red tint, sounds)"));
+        } else {
+            SoundUtil.playToggleOff(player);
+            player.sendMessage(TextUtil.colorize("&cSemi God Mode: &cOFF"));
+        }
+    }
+
+    private void handleRestore(Player player, String[] args) {
+        if (args.length == 0) {
+            // Show list of players with saved drops
+            var allDrops = DeathListener.getAllSavedDrops();
+            if (allDrops.isEmpty()) {
+                SoundUtil.playError(player);
+                player.sendMessage(TextUtil.colorize("&cNo saved inventories to restore."));
+                return;
+            }
+
+            player.sendMessage(TextUtil.colorize("&6Players with saved inventories:"));
+            for (var entry : allDrops.entrySet()) {
+                org.bukkit.OfflinePlayer offline = Bukkit.getOfflinePlayer(entry.getKey());
+                String name = offline.getName() != null ? offline.getName() : entry.getKey().toString().substring(0, 8);
+                int itemCount = entry.getValue().size();
+                String world = DeathListener.getDeathWorld(entry.getKey());
+                long deathTimeMs = DeathListener.getDeathTime(entry.getKey());
+                String timeAgo = formatTimeAgo(System.currentTimeMillis() - deathTimeMs);
+
+                player.sendMessage(TextUtil.colorize(
+                        "&e" + name + " &7- &f" + itemCount + " items &7- &f" + world + " &7- &f" + timeAgo + " ago"));
+            }
+            player.sendMessage(TextUtil.colorize("&7Usage: &e/ap restore <player>"));
+            return;
+        }
+
+        // Restore a specific player's items
+        String targetName = args[0];
+        org.bukkit.OfflinePlayer target = Bukkit.getOfflinePlayer(targetName);
+        UUID targetUUID = target.getUniqueId();
+
+        if (!DeathListener.hasDrops(targetUUID)) {
+            SoundUtil.playError(player);
+            player.sendMessage(TextUtil.colorize("&cNo saved inventory found for &e" + targetName));
+            return;
+        }
+
+        List<ItemStack> drops = DeathListener.retrieveDrops(targetUUID);
+        if (drops == null || drops.isEmpty()) {
+            SoundUtil.playError(player);
+            player.sendMessage(TextUtil.colorize("&cNo items to restore for &e" + targetName));
+            return;
+        }
+
+        // If target is online, give items directly
+        Player targetPlayer = Bukkit.getPlayer(targetUUID);
+        if (targetPlayer != null && targetPlayer.isOnline()) {
+            for (ItemStack item : drops) {
+                targetPlayer.getInventory().addItem(item);
+            }
+            SoundUtil.playSuccess(player);
+            player.sendMessage(TextUtil.colorize("&aRestored &f" + drops.size() + " items &ato &e" + target.getName()));
+            targetPlayer.sendMessage(TextUtil.colorize("&aAn admin has restored your items!"));
+        } else {
+            // Target offline -- drop items at their last known location or give to admin
+            for (ItemStack item : drops) {
+                player.getInventory().addItem(item);
+            }
+            SoundUtil.playSuccess(player);
+            player.sendMessage(TextUtil.colorize("&e" + target.getName() + " &7is offline. Items given to your inventory."));
+        }
+
+        plugin.getAuditManager().log(player, "ITEM_RESTORE", targetName,
+                "Restored " + drops.size() + " items");
+    }
+
+    private String formatTimeAgo(long ms) {
+        long seconds = ms / 1000;
+        long minutes = seconds / 60;
+        long hours = minutes / 60;
+        long days = hours / 24;
+
+        if (days > 0) return days + "d " + (hours % 24) + "h";
+        if (hours > 0) return hours + "h " + (minutes % 60) + "m";
+        if (minutes > 0) return minutes + "m " + (seconds % 60) + "s";
+        return seconds + "s";
     }
 
     private void handleTeleport(Player player, String[] args) {
@@ -378,7 +476,7 @@ public class StealthCommand extends Command {
             List<String> completions = new ArrayList<>(Arrays.asList(
                     "unbreakable", "repair", "ench", "name", "gm",
                     "heal", "feed", "fly", "speed", "clear",
-                    "god", "tp", "head", "anvil"
+                    "god", "semigod", "restore", "tp", "head", "anvil"
             ));
             return filterCompletions(completions, args[0]);
         }
@@ -397,7 +495,7 @@ public class StealthCommand extends Command {
                 }
                 case "gm", "gamemode" -> filterCompletions(
                         List.of("survival", "creative", "adventure", "spectator"), args[1]);
-                case "heal", "feed", "tp", "teleport", "head" -> {
+                case "heal", "feed", "tp", "teleport", "head", "restore" -> {
                     List<String> names = new ArrayList<>();
                     for (Player p : Bukkit.getOnlinePlayers()) names.add(p.getName());
                     yield filterCompletions(names, args[1]);

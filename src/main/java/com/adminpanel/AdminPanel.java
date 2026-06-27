@@ -162,6 +162,8 @@ public final class AdminPanel extends JavaPlugin {
         Bukkit.getPluginManager().registerEvents(new ChatListener(this, chatManager), this);
         Bukkit.getPluginManager().registerEvents(new ItemUseListener(this), this);
         Bukkit.getPluginManager().registerEvents(new DamageListener(this), this);
+        Bukkit.getPluginManager().registerEvents(new DeathListener(), this);
+        Bukkit.getPluginManager().registerEvents(new SemiGodListener(), this);
         Bukkit.getPluginManager().registerEvents(AnvilGUIBridge.getInstance(), this);
 
         getLogger().info("All listeners registered.");
